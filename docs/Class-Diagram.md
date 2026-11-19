@@ -1,7 +1,7 @@
 # 클래스 다이어그램 (v2.1, 로그라이크 + 로그라이트 영구 성장)
 
 > 기획서: [Project-Plan.md](./Project-Plan.md) · Mermaid `classDiagram` 형식 (GitHub, IntelliJ Mermaid 플러그인에서 렌더링)
-> 표기: `+` public, `-` private, `#` protected, `*` abstract 메서드, `$` static, `<<P1>>` 추가 기능
+> 표기: `+` public, `-` private, `#` protected, `~` package-private, `*` abstract 메서드, `$` static, `<<P1>>` 추가 기능
 
 ## 1. 전체 구조
 
@@ -38,7 +38,7 @@ classDiagram
 | A | 게임 루프·UI·세이브 | Main, GameManager, GameState, TurnSystem, Command, CommandParser, MessageLog, ConsoleView, MapRenderer, InputHandler, RandomUtil, SaveManager, SlotData, RunData, SaveFileParser, SaveLoadException, RankingManager(P1) |
 | B | 캐릭터·아이템·영구 성장 | Entity, Position, Player, Job, Stats, Item, Weapon, Armor, Potion, Scroll(P1), Food(P1), ItemType, Inventory, FloorItem, ItemFactory, ItemIdentifier(P1), Profile, UpgradeType, RunResult, ShardCalculator |
 | C | 몬스터·전투 | Monster, Boss, MonsterType, MonsterFactory, MonsterAI, CombatSystem, DamageCalculator, AttackResult |
-| D | 맵·생성 | Floor, Tile, Room, Direction, DungeonGenerator, FieldOfView(P1) |
+| D | 맵·생성 | Floor, Tile, Room, Direction, DungeonGenerator, FieldOfView(P1), DungeonGeneratorCheck(검증용, `src/test/java`) |
 
 ---
 
@@ -420,35 +420,61 @@ classDiagram
 
 ## 5. 맵 · 던전 생성 (D 파트)
 
+> **D 파트 보강안 (PR 리뷰로 팀 공유 후 확정)**: `Floor` getter·생성자·추가/검사 메서드 보강, 방 정보 세이브(`exportRooms`), `Tile.ROCK` 추가, `Room` 좌표 기준 명시, 5층 보스 배치·재생성 규칙, 검증 클래스 추가. 공통 클래스(`Tile`)와 다른 파트가 호출하는 public 시그니처 변경은 Team_Rules 1.1에 따라 합의 전까지 **제안** 상태다. 변경 이유와 합의 대상은 5.6 표 참고.
+
 ```mermaid
 classDiagram
     class Floor {
+        +WIDTH$ int
+        +HEIGHT$ int
         -int level
         -Tile[][] tiles
         -boolean[][] seen
+        -boolean[][] visible
         -List~Room~ rooms
         -List~Monster~ monsters
         -List~FloorItem~ items
         -Position stairs
         -Position startPos
-        +WIDTH$ int
-        +HEIGHT$ int
+        ~Floor(int level)
+        +fromSave(int level, List~String~ tiles, List~String~ seen, List~String~ rooms)$ Floor
+        +getLevel() int
         +getTile(int x, int y) Tile
+        +getTile(Position p) Tile
+        +isInBounds(Position p) boolean
         +isWalkable(Position p) boolean
+        +isFree(Position p) boolean
+        +randomFreePosition() Position
+        +getStartPos() Position
+        +getStairs() Optional~Position~
+        +getRooms() List~Room~
+        +roomAt(Position p) Room
+        +getMonsters() List~Monster~
         +getMonsterAt(Position p) Monster
-        +getItemAt(Position p) FloorItem
+        +addMonster(Monster m)
         +removeMonster(Monster m)
+        +getItems() List~FloorItem~
+        +getItemAt(Position p) FloorItem
         +addItem(FloorItem fi)
         +removeItem(FloorItem fi)
-        +roomAt(Position p) Room
         +isSeen(int x, int y) boolean
         +markSeen(int x, int y)
+        +isVisible(int x, int y) boolean
+        +setVisible(int x, int y)
+        +clearVisible()
+        +revealAll()
         +exportTiles() List~String~
         +exportSeen() List~String~
-        +fromSave(int level, List~String~ tiles, List~String~ seen)$ Floor
+        +exportRooms() List~String~
+        ~setTile(int x, int y, Tile t)
+        ~addRoom(Room r)
+        ~sortRoomsByX()
+        ~setStartPos(Position p)
+        ~setStairs(Position p)
     }
     class Tile {
         <<enumeration>>
+        ROCK
         WALL
         FLOOR
         CORRIDOR
@@ -457,6 +483,9 @@ classDiagram
         -char displayChar
         -char saveChar
         -boolean walkable
+        +getDisplayChar() char
+        +getSaveChar() char
+        +isWalkable() boolean
         +fromSaveChar(char c)$ Tile
     }
     class Room {
@@ -467,8 +496,11 @@ classDiagram
         int height
         +center() Position
         +contains(Position p) boolean
+        +containsWithWalls(Position p) boolean
         +intersects(Room o) boolean
         +randomInside() Position
+        +toSaveString() String
+        +fromSaveString(String s)$ Room
     }
     class Direction {
         <<enumeration>>
@@ -476,24 +508,38 @@ classDiagram
         DOWN
         LEFT
         RIGHT
+        -char key
         -int dx
         -int dy
+        +getKey() char
+        +getDx() int
+        +getDy() int
         +fromKey(char c)$ Direction
     }
     class DungeonGenerator {
+        +MAX_FLOOR$ int
         +generate(int level)$ Floor
         +createTestFloor()$ Floor
+        -tryGenerate(int level)$ Optional~Floor~
         -placeRooms(Floor f)$
+        -carveRoom(Floor f, Room r)$
         -connectRooms(Floor f)$
         -carveCorridor(Floor f, Position a, Position b)$
-        -placeStairs(Floor f)$
+        -carveTile(Floor f, int x, int y)$
+        -placeStartAndGoal(Floor f)$
         -placeMonsters(Floor f)$
         -placeItems(Floor f)$
-        -isReachable(Floor f, Position a, Position b)$ boolean
+        -placeGold(Floor f)$
+        ~isReachable(Floor f, Position a, Position b)$ boolean
     }
     class FieldOfView {
         <<P1>>
+        +CORRIDOR_RADIUS$ int
         +update(Floor f, Position playerPos)$
+    }
+    class DungeonGeneratorCheck {
+        <<test>>
+        +main(String[] args)$
     }
 
     Floor *-- Tile
@@ -501,12 +547,106 @@ classDiagram
     Floor o-- Monster
     Floor o-- FloorItem
     DungeonGenerator ..> Floor : creates
-    DungeonGenerator ..> MonsterFactory
-    DungeonGenerator ..> ItemFactory
+    DungeonGenerator ..> Room : creates
+    DungeonGenerator ..> MonsterFactory : createRandom, createBoss
+    DungeonGenerator ..> ItemFactory : createRandom
     FieldOfView ..> Floor
+    DungeonGeneratorCheck ..> DungeonGenerator
 ```
 
-> 생성 절차: ① 전부 WALL로 채움 → ② 크기 4~12 x 3~6인 방을 겹치지 않게 최대 50회 시도해 6~9개 배치 → ③ 방을 x좌표순 정렬 후 i번 ↔ i+1번 중심을 L자 복도로 연결, 방 경계와 만나는 칸은 DOOR → ④ 첫 방에 시작 위치, 마지막 방에 계단(5층은 보스) → ⑤ 시작 방 외 방들에 몬스터·아이템 배치 → ⑥ BFS로 시작 → 계단 도달 확인, 실패 시 재생성.
+### 5.1 Floor 메서드 계약
+
+| 메서드 | 계약 | 주 사용처 |
+|---|---|---|
+| `Floor(int level)` | package-private. 전부 `ROCK`, `seen`·`visible` 전부 false로 초기화. `map` 밖에서는 `generate()`·`createTestFloor()`·`fromSave()`로만 만든다 | D |
+| `fromSave(...)` | `tiles`·`seen`은 `HEIGHT`줄 × `WIDTH`자, `rooms`는 `Room.toSaveString()` 형식. 줄 수·길이 불일치, 모르는 문자, 잘못된 방 형식이면 `IllegalArgumentException` (A의 `SaveManager`가 `SaveLoadException`으로 감싼다). `stairs`는 타일에서 `STAIRS_DOWN`을 찾아 복원(없으면 5층), `startPos`는 첫 방 중심 | A |
+| `getTile(...)` | 맵 밖이면 `ROCK`을 반환한다(예외 없음). 범위 검사를 호출하는 쪽마다 반복하지 않게 하기 위해서다 | A, C |
+| `isInBounds(p)` | 0 ≤ x < `WIDTH`, 0 ≤ y < `HEIGHT` | 전체 |
+| `isWalkable(p)` | 범위 안이고 타일이 통행 가능하면 true. **몬스터·플레이어는 보지 않는다** | A, C |
+| `isFree(p)` | 타일이 `FLOOR`이고 몬스터·아이템이 없고 시작 위치가 아니면 true. 배치·순간이동용 | D, B |
+| `randomFreePosition()` | 무작위 방 안에서 `isFree`인 칸. 정해진 횟수 안에 못 찾으면 `IllegalStateException` | D, B(순간이동 두루마리) |
+| `getStairs()` | 5층은 계단이 없으므로 `Optional.empty()` | A(`DESCEND`, 렌더링) |
+| `roomAt(p)` | 방 **내부**(`Room.contains`)에 있으면 그 방, 복도·문·벽이면 **null** | C(같은 방 판정), D(시야) |
+| `getMonsterAt(p)` / `getItemAt(p)` | 없으면 **null** (Team_Rules 2.9의 맵 조회 예외, Javadoc에 명시) | A, B, C |
+| `getMonsters()` / `getItems()` / `getRooms()` | `List.copyOf()` 복사본. 몬스터 턴 도중 `removeMonster()`가 불려도 순회가 깨지지 않는다. 순회 중 죽은 몬스터는 `isAlive()`로 건너뛴다 | A, C |
+| `addMonster(m)` | 생성 배치와 세이브 복원에서 사용 | D, A |
+| `addItem(fi)` | 한 칸에 여러 개를 허용한다(버리기가 항상 성공하도록). `getItemAt()`은 가장 나중에 놓인 것을 반환 | B, A |
+| `markSeen` / `isSeen` | 한 번이라도 본 칸. 세이브 대상 | D, A |
+| `setVisible` / `isVisible` / `clearVisible` | **P1**. 이번 턴에 보이는 칸. `setVisible()`은 `seen`도 함께 표시한다. 세이브하지 않는다 | D, A(렌더링) |
+| `revealAll()` | **P1**. 모든 칸을 `seen`으로 표시 (지도 두루마리) | B |
+| `exportTiles()` / `exportSeen()` / `exportRooms()` | 세이브용 문자열. `exportRooms()`는 방마다 `x,y,width,height` 한 줄 | A |
+
+> P0(시야 구현 전)에서는 `MapRenderer`가 `seen`/`visible`을 무시하고 전체를 그린다. P1 시야를 켜면 `MapRenderer.symbolAt()` 주석의 규칙(안 본 칸은 공백, 본 적만 있는 칸은 타일만)을 적용한다.
+
+### 5.2 Tile · Room 규칙
+
+- **`Tile.ROCK` 추가** (`' '` 화면, `'R'` 저장, 통행 불가): 방 바깥의 빈 공간. 기존에는 바깥을 `WALL`(`#`)로 채워서 복도(`#`)와 구분이 안 되고, P0에서 맵 전체가 `#`로 보인다. 1.1절 화면 예시처럼 방 벽만 `#`, 바깥은 공백이 되게 한다. *공통 클래스 변경이므로 팀 공유 후 반영.*
+- `Room`의 `x, y, width, height`는 **바닥(내부) 영역** 기준이다. 벽은 그 바깥 한 칸 둘레(`x-1` ~ `x+width`, `y-1` ~ `y+height`)다.
+- 벽까지 포함한 영역이 맵 안에 있어야 한다: `1 ≤ x`, `x + width ≤ WIDTH - 1` (y도 같은 방식).
+- `contains(p)`는 내부만, `containsWithWalls(p)`는 벽까지 포함한다.
+- `intersects(o)`는 **벽까지 포함한 영역**끼리 겹치면 true를 반환한다. 따라서 두 방이 벽을 공유하지 않는다.
+- `toSaveString()` / `fromSaveString()`: `"x,y,width,height"`. 형식 오류는 `IllegalArgumentException`.
+- `randomInside()`, `randomFreePosition()`, 생성기의 모든 난수는 `RandomUtil`만 사용한다(Team_Rules 1.2). 그래야 `setSeed()`로 생성 결과를 재현할 수 있다.
+
+### 5.3 생성 절차 (`DungeonGenerator.generate(level)`)
+
+1. 새 `Floor`(전부 `ROCK`)를 만든다.
+2. **방 배치**: 내부 크기 4~12 × 3~6인 방을 최대 50회 시도해 `intersects`가 없는 것만 추가한다(최대 9개). `tryGenerate`는 배치 후 `getRooms().size()`가 `MIN_ROOMS` 미만이면 이번 시도를 실패로 처리한다. 추가한 방마다 둘레는 `WALL`, 내부는 `FLOOR`로 채운다.
+3. **복도 연결**: 방을 x좌표순으로 정렬(`sortRoomsByX`)한 뒤 i번 중심 ↔ i+1번 중심을 L자로 판다. 가로를 먼저 팔지 세로를 먼저 팔지는 무작위다. `carveTile` 규칙은 `ROCK` → `CORRIDOR`, `WALL` → `DOOR`이고 `FLOOR`·`DOOR`는 그대로 둔다.
+4. **시작·목표** (`placeStartAndGoal`): 첫 방 `randomInside()`를 시작 위치로 정한다. 1~4층은 마지막 방 `randomInside()`에 `STAIRS_DOWN`을 놓는다. 5층(`MAX_FLOOR`)은 계단 대신 마지막 방에 `MonsterFactory.createBoss(pos)`를 놓는다.
+5. **배치**: 시작 방을 뺀 방들의 `isFree` 칸에 다음을 놓는다.
+   - 몬스터 4~8마리: `MonsterFactory.createRandom(level, pos)`
+   - 아이템 3~6개: `ItemFactory.createRandom(level)`
+   - 골드 더미: `FloorItem` 골드
+6. **검증**: BFS(`isReachable`, 타일만 검사, 몬스터는 무시)로 시작 위치 → 계단(5층은 보스 위치) 도달을 확인한다.
+
+2·6단계에서 실패하면 1단계부터 다시 한다(`tryGenerate`가 `Optional.empty()`를 반환). `MAX_ATTEMPTS`번 연속 실패하면 `IllegalStateException`을 던진다.
+
+**생성 상수 (`DungeonGenerator`에 모음, Team_Rules 1.2)**
+
+| 상수 | 값 (초안) |
+|---|---|
+| `MAX_FLOOR` | 5 |
+| `MIN_ROOMS` / `MAX_ROOMS` | 6 / 9 |
+| `ROOM_PLACE_TRIES` | 50 |
+| `ROOM_MIN_W` / `ROOM_MAX_W` | 4 / 12 |
+| `ROOM_MIN_H` / `ROOM_MAX_H` | 3 / 6 |
+| `MIN_MONSTERS` / `MAX_MONSTERS` | 4 / 8 |
+| `MIN_ITEMS` / `MAX_ITEMS` | 3 / 6 |
+| `MIN_GOLD_PILES` / `MAX_GOLD_PILES` | 2 / 4 (기획서에 수치 없음, 초안) |
+| `GOLD_PER_FLOOR_MIN` / `GOLD_PER_FLOOR_MAX` | 5 / 15 → 더미 하나에 층 × 5 ~ 층 × 15 (초안) |
+| `MAX_ATTEMPTS` | 100 |
+
+### 5.4 시야 (P1, `FieldOfView.update`)
+
+1. `clearVisible()`을 호출한다.
+2. 플레이어가 방 안에 있으면(`roomAt != null`) 그 방의 벽까지 포함한 전체를 `setVisible`한다.
+3. 복도·문 위에 있으면 주변 `CORRIDOR_RADIUS`(=1)칸을 `setVisible`한다.
+
+플레이어가 이동한 뒤마다 호출한다. 호출 위치는 A의 `TurnSystem`이다.
+
+### 5.5 검증 (`src/test/java/com/textrpg/map/DungeonGeneratorCheck`)
+
+`RandomUtil.setSeed()`로 고정한 뒤 1~5층을 각 1000회 생성하고 다음을 확인한다. `isReachable`가 package-private이므로 같은 패키지에 둔다. IntelliJ에서 `main`으로 실행한다.
+- 방 개수 6~9, 방끼리 겹침 없음, 모든 방이 맵 안에 있음
+- 시작 → 계단(5층은 보스) 도달 가능, **모든 방 중심이 시작에서 도달 가능**
+- 1~4층은 계단 정확히 1개, 5층은 계단 0개 + 보스 1마리
+- 몬스터·아이템 개수가 범위 안, 같은 칸에 두 개 이상 놓이지 않음, 시작 위치에 아무것도 없음
+- `exportTiles/Seen/Rooms()` → `fromSave()` 왕복 결과가 원본과 같음
+
+### 5.6 변경 사항과 다른 파트 합의 필요 항목
+
+| 변경 | 이유 | 합의 대상 |
+|---|---|---|
+| `exportRooms()` 추가, `fromSave()`에 `rooms` 인자 추가 | 이어하기 후 `roomAt()`이 항상 null이 되어 AI "같은 방" 판정과 시야가 깨짐. 7절 `[FLOOR]`에 `room=x,y,w,h` 줄 추가 필요 | A |
+| `getMonsters/getItems/getRooms/getLevel/getStartPos/getStairs`, `addMonster` 추가 | 턴 루프, 렌더링, 세이브 복원, 플레이어 시작 위치 지정에 필요한데 없었음 | A, C |
+| `isInBounds`, `isFree`, `randomFreePosition` 추가 / `isWalkable` 의미 명시 | 맵 밖 접근 방지, 배치 겹침 방지, 순간이동 두루마리 | C, B |
+| `visible`, `isVisible/setVisible/clearVisible`, `revealAll` (P1) | 렌더러의 "본 적만 있는 칸" 처리와 지도 두루마리에 필요 | A, B |
+| package-private 생성자·수정 메서드 | static `DungeonGenerator`가 `Floor`를 만들고 채울 수단이 없었음 | - |
+| `Tile.ROCK` 추가 | 바깥 공간과 복도가 둘 다 `#`로 보이는 문제 | **팀 전체** (공통 클래스) |
+| `Room` 좌표를 내부 기준으로 하고 `intersects`에 벽 포함 | 방끼리 벽을 공유하면 문 판정이 꼬임 | - |
+| 5층 보스 배치, 재생성 상한, 생성 상수 표 | 기존 절차에 없거나 수치가 흩어져 있었음 | C(`createBoss`) |
+| 골드 더미 배치 (`placeGold`) | `FloorItem`으로 골드를 표현하는 방법이 정해지지 않음 → `FloorItem.ofItem(item, pos)`, `ofGold(amount, pos)`, `isGold()` 제안 | B |
 
 ---
 
