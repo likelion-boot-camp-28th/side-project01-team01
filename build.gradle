@@ -25,6 +25,34 @@ application {
     applicationDefaultJvmArgs = ['-Dfile.encoding=UTF-8', '-Dstdout.encoding=UTF-8']
 }
 
+// JUnit 을 쓰지 않으므로 기본 test 태스크는 끄고, src/test/java 의 확인용 main 클래스를 실행한다 (Team_Rules 2.11).
+// 확인용 클래스를 새로 만들면 아래 목록에 추가한다. 하나라도 실패(종료 코드 1)하면 build 가 실패한다.
+def checkClasses = [
+        'com.textrpg.game.CommandParserCheck',
+]
+
+tasks.named('test') {
+    enabled = false
+}
+
+def runChecks = tasks.register('runChecks') {
+    group = 'verification'
+    description = 'src/test/java 의 확인용 main 클래스를 모두 실행한다.'
+}
+
+checkClasses.each { className ->
+    def checkTask = tasks.register('run' + className.tokenize('.').last(), JavaExec) {
+        group = 'verification'
+        classpath = sourceSets.test.runtimeClasspath
+        mainClass = className
+    }
+    runChecks.configure { dependsOn checkTask }
+}
+
+tasks.named('check') {
+    dependsOn runChecks
+}
+
 // ./gradlew run 에서 키보드 입력(Scanner)을 받을 수 있게 표준 입력을 연결한다.
 tasks.named('run') {
     standardInput = System.in
