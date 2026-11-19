@@ -21,11 +21,11 @@ java -jar build/libs/into-the-dark-0.1.0.jar
 
 | 패키지 | 담당 | 내용 |
 |---|---|---|
-| `game`, `ui`, `save`, `Main` | @nullsector12 | 게임 루프, 명령 입력, 화면 렌더링, 세이브/로드, 제단 화면 |
-| `entity`, `item`, `meta` | @efkoskf | 플레이어·직업·스탯, 아이템·가방, 영구 성장 |
-| `monster`, `combat` | @oeuns2219 | 몬스터·AI, 충돌 전투 |
-| `map` | @gunheekk | 타일 맵, 방·복도 생성 |
-| `util` | @nullsector12 | `RandomUtil` |
+| `game`, `ui`, `save`, `Main` | [@nullsector12](https://github.com/nullsector12) | 게임 루프, 명령 입력, 화면 렌더링, 세이브/로드, 제단 화면 |
+| `entity`, `item`, `meta` | [@efkoskf](https://github.com/efkoskf) | 플레이어·직업·스탯, 아이템·가방, 영구 성장 |
+| `monster`, `combat` | [@oeuns2219](https://github.com/oeuns2219) | 몬스터·AI, 충돌 전투 |
+| `map` | [@gunheekk](https://github.com/gunheekk) | 타일 맵, 방·복도 생성 |
+| `util` | [@nullsector12](https://github.com/nullsector12) | `RandomUtil` |
 
 ## 공통 클래스 (이미 구현됨, 변경 시 팀 공유 필수)
 
