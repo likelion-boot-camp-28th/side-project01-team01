@@ -519,6 +519,22 @@ classDiagram
     }
     class DungeonGenerator {
         +MAX_FLOOR$ int
+        -MIN_ROOMS$ int
+        -MAX_ROOMS$ int
+        -ROOM_PLACE_TRIES$ int
+        -ROOM_MIN_W$ int
+        -ROOM_MAX_W$ int
+        -ROOM_MIN_H$ int
+        -ROOM_MAX_H$ int
+        -MIN_MONSTERS$ int
+        -MAX_MONSTERS$ int
+        -MIN_ITEMS$ int
+        -MAX_ITEMS$ int
+        -MIN_GOLD_PILES$ int
+        -MAX_GOLD_PILES$ int
+        -GOLD_PER_FLOOR_MIN$ int
+        -GOLD_PER_FLOOR_MAX$ int
+        -MAX_ATTEMPTS$ int
         +generate(int level)$ Floor
         +createTestFloor()$ Floor
         -tryGenerate(int level)$ Optional~Floor~
@@ -603,7 +619,7 @@ classDiagram
 
 2·6단계에서 실패하면 1단계부터 다시 한다(`tryGenerate`가 `Optional.empty()`를 반환). `MAX_ATTEMPTS`번 연속 실패하면 `IllegalStateException`을 던진다.
 
-**생성 상수 (`DungeonGenerator`에 모음, Team_Rules 1.2)**
+**생성 상수 (`DungeonGenerator`에 모음, Team_Rules 1.2)**: 위 다이어그램의 `DungeonGenerator` 상수와 같다. 값은 이 표가 기준이다. 다른 파트도 쓰는 `MAX_FLOOR`만 `public`, 나머지는 `private`.
 
 | 상수 | 값 (초안) |
 |---|---|
