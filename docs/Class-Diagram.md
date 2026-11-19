@@ -373,6 +373,7 @@ classDiagram
         -int attack
         -int defense
         -int exp
+        -int gold
         -int speed
     }
     class MonsterFactory {
