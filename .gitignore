@@ -1,0 +1,72 @@
+# ============================================================
+# Into the Dark - .gitignore (Java 17 + Gradle)
+# ============================================================
+
+# ---------- Gradle ----------
+.gradle/
+build/
+# 래퍼 jar 는 반드시 커밋한다 (팀원이 Gradle 설치 없이 빌드하기 위해)
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+# 개인 로컬 설정 (JDK 경로 등)
+local.properties
+
+# ---------- Java ----------
+*.class
+*.log
+hs_err_pid*.log
+replay_pid*.log
+# 빌드 산출물 (jar 는 build/libs 에 생기므로 루트에 생긴 것만 무시)
+/*.jar
+/*.war
+
+# ---------- 게임 실행 데이터 ----------
+# 세이브 슬롯, 랭킹, 저장 중 임시 파일
+saves/
+*.sav
+*.sav.tmp
+
+# ---------- IntelliJ IDEA ----------
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# ---------- Eclipse ----------
+.classpath
+.project
+.settings/
+bin/
+
+# ---------- VS Code ----------
+.vscode/
+# Java 확장이 만드는 출력 폴더
+.factorypath
+
+# ---------- NetBeans ----------
+nbproject/private/
+nbbuild/
+dist/
+nbdist/
+.nb-gradle/
+
+# ---------- macOS ----------
+.DS_Store
+._*
+
+# ---------- Windows ----------
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ---------- Linux ----------
+*~
+.directory
+
+# ---------- 기타 ----------
+*.tmp
+*.bak
+*.swp
+.env
