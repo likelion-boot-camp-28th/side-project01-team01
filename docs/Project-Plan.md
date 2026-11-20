@@ -342,8 +342,8 @@ into-the-dark/
    ├─ game/        GameManager, TurnSystem, Command, CommandParser, MessageLog, GameState
    ├─ ui/          ConsoleView, MapRenderer, InputHandler
    ├─ entity/      Entity(추상), Position, Player, Job, Stats
-   ├─ monster/     Monster, Boss, MonsterType, MonsterFactory, MonsterAI
-   ├─ combat/      CombatSystem, DamageCalculator, AttackResult
+   ├─ monster/     Monster, Boss, MonsterType, MonsterFactory
+   ├─ combat/      CombatSystem, DamageCalculator, AttackResult, MonsterAI
    ├─ item/        Item(추상), Weapon, Armor, Potion, Scroll(P1), Food(P1), ItemType,
    │               Inventory, ItemFactory, ItemIdentifier(P1), FloorItem
    ├─ map/         Floor, Tile, Room, DungeonGenerator, FieldOfView(P1), Direction

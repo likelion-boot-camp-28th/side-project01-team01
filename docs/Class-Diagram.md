@@ -378,7 +378,7 @@ classDiagram
     class Monster {
         -MonsterType type
         -boolean awake
-        +Monster(MonsterType type, Position pos)
+        ~Monster(MonsterType type, Position pos)
         +getType() MonsterType
         +getAttack() int
         +getDefense() int
@@ -388,6 +388,7 @@ classDiagram
         +wakeUp()
     }
     class Boss {
+        ~Boss(Position pos)
         +attacksPerTurn() int
     }
     class MonsterType {
@@ -411,6 +412,9 @@ classDiagram
         -int exp
         -int gold
         -int speed
+        -double hitRate
+        -double critRate
+        -double evadeRate
     }
     class MonsterFactory {
         +create(MonsterType t, Position pos)$ Monster
@@ -431,7 +435,8 @@ classDiagram
     class DamageCalculator {
         +rollHit(Entity atk, Entity def)$ boolean
         +rollCritical(Entity atk)$ boolean
-        +calculate(Entity atk, Entity def, boolean crit)$ int
+        +calculate(Entity atk, Entity def)$ int
+        +applyCritical(int damage)$ int
     }
     class AttackResult {
         <<record>>
@@ -450,11 +455,12 @@ classDiagram
     CombatSystem ..> AttackResult : returns
 ```
 
-> 몬스터 확률 스탯: `MonsterType`에 따로 두지 않고 `Monster` 생성자에서 `speed`로 계산한다.
+> 몬스터 확률 스탯: `MonsterType` 생성자에서 `speed`로 계산해 `hitRate`·`critRate`·`evadeRate`에 저장하고, `Monster` 생성자는 이 값으로 `Stats`를 만든다. 몬스터 밸런스 수치는 모두 `MonsterType` 한곳에 둔다.
 >   명중 = 70 + 15×speed, 치명타 = 5×speed, 회피 = 5×speed (단위 %, 몬스터 MP는 0)
 > 명중 판정: `chance(공격자 명중) && !chance(방어자 회피)`. 실제 명중 확률 = 명중 × (1 − 회피).
-> 데미지: 명중 실패 시 0 → `max(1, round((공격 - 방어) × 0.9~1.1))` → 치명타 시 `round(데미지 × 1.5)`.
-> 생성: `create(MonsterType, pos)`에 ABYSS_WARDEN을 넘기면 `Boss`를 돌려준다.
+> 데미지: 명중 실패 시 0 → `calculate()`가 `max(1, round((공격 - 방어) × 0.9~1.1))` → 치명타 시 `applyCritical()`이 `round(데미지 × 1.5)`.
+> 생성: `Monster`·`Boss` 생성자는 package-private이라 `MonsterFactory`로만 만들 수 있다 (Team_Rules 1.2).
+>   `create(MonsterType, pos)`에 ABYSS_WARDEN을 넘기면 `Boss`를 돌려준다.
 >   `createRandom(floorLevel, pos)`는 보스를 뺀 8종 중 minFloor ≤ floorLevel ≤ maxFloor인 종류를 무작위로 고른다.
 >   floorLevel이 1~5 밖이면 `IllegalArgumentException`을 던진다.
 > AI 규칙: 깨어 있지 않으면 대기, 플레이어가 같은 방 또는 6칸 이내면 깨어남. 깨어 있으면 인접 시 공격, 아니면 x·y 중 거리가 큰 축으로 한 칸 이동(막히면 다른 축). `speed`가 2면 2번 행동, 슬라임처럼 느린 몬스터는 짝수 턴에만 행동.
