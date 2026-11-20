@@ -30,6 +30,7 @@ application {
 def checkClasses = [
         'com.textrpg.game.CommandParserCheck',
         'com.textrpg.save.SaveFileParserCheck',
+        'com.textrpg.save.SaveFileWriterCheck',
 ]
 
 tasks.named('test') {
