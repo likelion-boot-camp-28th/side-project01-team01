@@ -1,7 +1,7 @@
 package com.textrpg.monster;
 
+import com.textrpg.core.Position;
 import com.textrpg.entity.Entity;
-import com.textrpg.entity.Position;
 import com.textrpg.entity.Stats;
 
 public class Monster extends Entity {

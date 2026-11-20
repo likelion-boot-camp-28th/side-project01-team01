@@ -1,6 +1,6 @@
 package com.textrpg.map;
 
-import com.textrpg.entity.Position;
+import com.textrpg.core.Position;
 
 import java.util.Optional;
 

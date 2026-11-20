@@ -1,5 +1,6 @@
 package com.textrpg.entity;
 
+import com.textrpg.core.Position;
 import com.textrpg.item.FloorItem;
 import com.textrpg.item.Inventory;
 import com.textrpg.item.ItemFactory;

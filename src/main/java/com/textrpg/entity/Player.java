@@ -2,6 +2,7 @@ package com.textrpg.entity;
 
 import java.util.Optional;
 
+import com.textrpg.core.Position;
 import com.textrpg.item.Armor;
 import com.textrpg.item.Inventory;
 import com.textrpg.item.Item;

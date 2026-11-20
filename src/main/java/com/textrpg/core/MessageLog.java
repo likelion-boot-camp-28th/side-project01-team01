@@ -1,4 +1,4 @@
-package com.textrpg.game;
+package com.textrpg.core;
 
 import java.util.ArrayList;
 import java.util.Collections;

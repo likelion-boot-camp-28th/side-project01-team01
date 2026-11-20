@@ -1,7 +1,7 @@
 package com.textrpg.combat;
 
+import com.textrpg.core.MessageLog;
 import com.textrpg.entity.Entity;
-import com.textrpg.game.MessageLog;
 import com.textrpg.monster.Monster;
 
 public class CombatSystem {

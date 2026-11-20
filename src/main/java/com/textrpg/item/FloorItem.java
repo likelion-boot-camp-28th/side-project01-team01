@@ -1,6 +1,6 @@
 package com.textrpg.item;
 
-import com.textrpg.entity.Position;
+import com.textrpg.core.Position;
 
 /**
  * 바닥에 놓인 아이템 또는 골드 더미.

@@ -1,5 +1,7 @@
 package com.textrpg.entity;
 
+import com.textrpg.core.Position;
+
 /**
  * 맵 위에 존재하는 생명체(플레이어, 몬스터)의 공통 부모.
  * 장비 보너스 등이 붙는 실제 공격력·방어력은 하위 클래스가 getAttack()/getDefense() 로 계산한다.

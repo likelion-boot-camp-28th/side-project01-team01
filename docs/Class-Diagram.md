@@ -35,10 +35,13 @@ classDiagram
 
 | 파트 | 담당 | 클래스 |
 |---|---|---|
-| A | 게임 루프·UI·세이브 | Main, GameManager, GameState, TurnSystem, Command, CommandParser, MessageLog, ConsoleView, MapRenderer, InputHandler, RandomUtil, SaveManager, SlotData, RunData, SaveFileParser, SaveLoadException, RankingManager(P1) |
-| B | 캐릭터·아이템·영구 성장 | Entity, Position, Player, Job, Stats, Item, Weapon, Armor, Potion, Scroll(P1), Food(P1), ItemType, Inventory, FloorItem, ItemFactory, ItemIdentifier(P1), Profile, UpgradeType, RunResult, ShardCalculator |
+| A | 게임 루프·UI·세이브 | Main, GameManager, GameState, TurnSystem, Command, CommandParser, ConsoleView, MapRenderer, InputHandler, RandomUtil, SaveManager, SlotData, RunData, SaveFileParser, SaveLoadException, RankingManager(P1) |
+| B | 캐릭터·아이템·영구 성장 | Entity, Player, Job, Stats, Item, Weapon, Armor, Potion, Scroll(P1), Food(P1), ItemType, Inventory, FloorItem, ItemFactory, ItemIdentifier(P1), Profile, UpgradeType, RunResult, ShardCalculator |
 | C | 몬스터·전투 | Monster, Boss, MonsterType, MonsterFactory, MonsterAI, CombatSystem, DamageCalculator, AttackResult |
-| D | 맵·생성 | Floor, Tile, Room, Direction, DungeonGenerator, FieldOfView(P1), DungeonGeneratorCheck(검증용, `src/test/java`) |
+| D | 맵·생성 | Floor, Tile, Room, DungeonGenerator, FieldOfView(P1), DungeonGeneratorCheck(검증용, `src/test/java`) |
+| 공통 | `core` 패키지 (수정 전 팀 공유) | Position, Direction, MessageLog |
+
+> **`core` 패키지:** 여러 파트가 함께 쓰는 타입을 모은다. 아래 다이어그램에서는 처음 쓰는 파트 쪽에 그려 두었지만 실제 위치는 `com.textrpg.core`다.
 
 ---
 

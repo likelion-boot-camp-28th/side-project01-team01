@@ -1,6 +1,6 @@
 package com.textrpg.map;
 
-import com.textrpg.entity.Position;
+import com.textrpg.core.Position;
 
 /**
  * 직사각형 방.
