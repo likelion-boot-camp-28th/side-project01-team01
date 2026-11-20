@@ -3,6 +3,7 @@ package com.textrpg.entity;
 import com.textrpg.core.Position;
 import com.textrpg.item.FloorItem;
 import com.textrpg.item.Inventory;
+import com.textrpg.item.Item;
 import com.textrpg.item.ItemFactory;
 import com.textrpg.item.Weapon;
 import com.textrpg.meta.Profile;
@@ -24,6 +25,7 @@ public final class PlayerSkeletonCheck {
     public static void main(String[] args) {
         checkNewPlayer();
         checkInventory();
+        checkStatSum();
         checkUpgradeCost();
         checkProfileAndRun();
         checkFloorItem();
@@ -53,6 +55,17 @@ public final class PlayerSkeletonCheck {
         check("12칸 가득 참", bag.isFull());
         check("가득 차면 못 넣음", !bag.add(ItemFactory.createById("HP_POTION_S")));
         check("id 로 무기 생성", ItemFactory.createById("IRON_SWORD") instanceof Weapon);
+
+        Item sword = ItemFactory.createById("IRON_SWORD");
+        check("아이템 설명 있음", !sword.getDescription().isBlank());
+        check("철 검 1~3층 드랍", sword.canDropOn(1) && sword.canDropOn(3) && !sword.canDropOn(4));
+    }
+
+    private static void checkStatSum() {
+        Player p = new Player("용사", Job.WARRIOR);
+        check("맨손 무기 공격 0", p.getWeaponAttack() == 0);
+        check("공격 = 기본 + 무기", p.getAttack() == p.getBaseAttack() + p.getWeaponAttack());
+        check("방어 = 기본 + 방어구", p.getDefense() == p.getBaseDefense() + p.getArmorDefense());
     }
 
     private static void checkUpgradeCost() {

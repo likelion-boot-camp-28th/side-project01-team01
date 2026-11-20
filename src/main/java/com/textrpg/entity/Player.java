@@ -11,7 +11,7 @@ import com.textrpg.item.Weapon;
 
 /**
  * 플레이어 캐릭터. Entity 를 상속하고, 직업·레벨·경험치·골드·장비·가방을 더 가진다.
- * 실제 공격력/방어력 = 기본 능력치 + 장비 보너스.
+ * 실제 공격력 = 기본 공격력 + 무기 공격력, 실제 방어력 = 기본 방어력 + 방어구 방어력.
  */
 public class Player extends Entity implements ItemUser {
 
@@ -40,16 +40,36 @@ public class Player extends Entity implements ItemUser {
         this.job = job;
     }
 
+    /** 최종 공격력 = 기본 공격력 + 무기 공격력. 전투(DamageCalculator)는 이 값을 쓴다. */
     @Override
     public int getAttack() {
-        int bonus = (weapon == null) ? 0 : weapon.getAttackBonus();
-        return stats.getAttack() + bonus;
+        return getBaseAttack() + getWeaponAttack();
     }
 
+    /** 최종 방어력 = 기본 방어력 + 방어구 방어력. */
     @Override
     public int getDefense() {
-        int bonus = (armor == null) ? 0 : armor.getDefenseBonus();
-        return stats.getDefense() + bonus;
+        return getBaseDefense() + getArmorDefense();
+    }
+
+    /** 장비를 뺀 기본 공격력 (직업 시작값 + 레벨업 + 영구 강화). */
+    public int getBaseAttack() {
+        return getStats().getAttack();
+    }
+
+    /** 무기로 늘어난 공격력. 맨손이면 0. */
+    public int getWeaponAttack() {
+        return (weapon == null) ? 0 : weapon.getAttackBonus();
+    }
+
+    /** 장비를 뺀 기본 방어력. */
+    public int getBaseDefense() {
+        return getStats().getDefense();
+    }
+
+    /** 방어구로 늘어난 방어력. 방어구가 없으면 0. */
+    public int getArmorDefense() {
+        return (armor == null) ? 0 : armor.getDefenseBonus();
     }
 
     public Job getJob() {
@@ -109,6 +129,7 @@ public class Player extends Entity implements ItemUser {
     /** MP 를 회복하고, 실제로 회복된 MP 양을 돌려준다. */
     @Override
     public int restoreMp(int amount) {
+        Stats stats = getStats();
         int before = stats.getMp();
         stats.setMp(before + Math.max(0, amount));
         return stats.getMp() - before;
