@@ -1,2 +1,2 @@
-/** C 파트: 몬스터 종류(MonsterType), 생성(MonsterFactory), 이동 AI(MonsterAI), 보스. */
+/** C 파트: 몬스터 종류(MonsterType), 생성(MonsterFactory), 보스(Boss). */
 package com.textrpg.monster;
