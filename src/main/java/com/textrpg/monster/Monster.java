@@ -10,7 +10,7 @@ public class Monster extends Entity {
     private boolean awake;
 
     public Monster(MonsterType type, Position pos) {
-        super(type.name(), type.symbol, pos, new Stats(type.hp, 0, type.attack, type.defense, 50 + (25 * type.speed), 50, 25 * type.speed));
+        super(type.displayName, type.symbol, pos, new Stats(type.hp, 0, type.attack, type.defense, 70 + (15 * type.speed), 5 * type.speed, 5 * type.speed));
         this.type = type;
         this.awake = false;
     }
@@ -26,6 +26,8 @@ public class Monster extends Entity {
     public int getDefense() {return type.defense;}
 
     public int getExpReward(){return type.exp;}
+
+    public int getGoldReward(){return type.gold;}
 
     public boolean isAwake() {
         return awake;

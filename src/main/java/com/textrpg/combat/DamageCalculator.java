@@ -14,8 +14,8 @@ public class DamageCalculator {
     }
 
     public static int calculate(Entity atk, Entity def, boolean crit){
-        int damage = Math.max(1, atk.getAttack() - def.getDefense()) * (int) (10 * RandomUtil.nextDouble(0.9, 1.1)) / 10;
-        if(crit) return damage + (damage / 2);
+        int damage = Math.toIntExact(Math.max(1, Math.round((atk.getAttack() - def.getDefense()) * RandomUtil.nextDouble(0.9, 1.1))));
+        if(crit) return Math.toIntExact(Math.round(damage * 1.5));
         else return damage;
     }
 }
