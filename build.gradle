@@ -29,6 +29,7 @@ application {
 // 확인용 클래스를 새로 만들면 아래 목록에 추가한다. 하나라도 실패(종료 코드 1)하면 build 가 실패한다.
 def checkClasses = [
         'com.textrpg.game.CommandParserCheck',
+        'com.textrpg.save.SaveFileParserCheck',
 ]
 
 tasks.named('test') {
