@@ -1,6 +1,6 @@
 package com.textrpg.game;
 
-import com.textrpg.map.Direction;
+import com.textrpg.core.Direction;
 
 import java.util.List;
 

@@ -1,4 +1,4 @@
-package com.textrpg.map;
+package com.textrpg.core;
 
 /**
  * 이동 방향. 좌표계는 x 가 오른쪽(열), y 가 아래쪽(행)으로 증가한다.

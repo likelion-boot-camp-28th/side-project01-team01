@@ -16,7 +16,7 @@ public class RunResult {
     private String deathCause = "";
     private int turns;
 
-    /** 몬스터를 처치할 때마다 C 의 CombatSystem.rewardKill() 이 호출한다. */
+    /** 몬스터를 처치할 때마다 C 의 CombatSystem.rewardKill() 이 ctx.getRunResult().addKill() 로 호출한다. */
     public void addKill() {
         kills++;
     }
@@ -29,7 +29,7 @@ public class RunResult {
     /** 사망하거나 클리어했을 때 호출한다. */
     public void finish(Player p, boolean victory, String cause) {
         // TODO(B): finalLevel = p.getLevel(), gold = p.getGold(), this.victory, deathCause 저장
-        //  turns 는 누가 넘겨줄지 A와 합의 필요
+        //  turns 는 GameContext.getTurn() 값을 받는 방법으로 A와 합의 필요
         throw new UnsupportedOperationException("TODO(B): RunResult.finish");
     }
 

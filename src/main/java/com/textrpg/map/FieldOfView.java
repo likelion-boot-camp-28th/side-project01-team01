@@ -1,6 +1,6 @@
 package com.textrpg.map;
 
-import com.textrpg.entity.Position;
+import com.textrpg.core.Position;
 
 /**
  * (P1) 시야 계산. 방 안에서는 방 전체(벽 포함), 복도·문에서는 주변 CORRIDOR_RADIUS 칸이 보인다.

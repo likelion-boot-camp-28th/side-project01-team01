@@ -35,10 +35,34 @@ classDiagram
 
 | 파트 | 담당 | 클래스 |
 |---|---|---|
-| A | 게임 루프·UI·세이브 | Main, GameManager, GameState, TurnSystem, Command, CommandParser, MessageLog, ConsoleView, MapRenderer, InputHandler, RandomUtil, SaveManager, SlotData, RunData, SaveFileParser, SaveLoadException, RankingManager(P1) |
-| B | 캐릭터·아이템·영구 성장 | Entity, Position, Player, Job, Stats, Item, Weapon, Armor, Potion, Scroll(P1), Food(P1), ItemType, Inventory, FloorItem, ItemFactory, ItemIdentifier(P1), Profile, UpgradeType, RunResult, ShardCalculator |
+| A | 게임 루프·UI·세이브 | Main, GameManager, GameState, TurnSystem, Command, CommandParser, ConsoleView, MapRenderer, InputHandler, RandomUtil, SaveManager, SlotData, RunData, SaveFileParser, SaveLoadException, RankingManager(P1) |
+| B | 캐릭터·아이템·영구 성장 | Entity, Player, Job, Stats, Item, Weapon, Armor, Potion, Scroll(P1), Food(P1), ItemType, ItemUser, Inventory, FloorItem, ItemFactory, ItemIdentifier(P1), Profile, UpgradeType, RunResult, ShardCalculator |
 | C | 몬스터·전투 | Monster, Boss, MonsterType, MonsterFactory, MonsterAI, CombatSystem, DamageCalculator, AttackResult |
-| D | 맵·생성 | Floor, Tile, Room, Direction, DungeonGenerator, FieldOfView(P1), DungeonGeneratorCheck(검증용, `src/test/java`) |
+| D | 맵·생성 | Floor, Tile, Room, DungeonGenerator, FieldOfView(P1), DungeonGeneratorCheck(검증용, `src/test/java`) |
+| 공통 | `core` 패키지 (수정 전 팀 공유) | Position, Direction, MessageLog |
+| 공통 | `context` 패키지 (수정 전 팀 공유) | GameContext |
+
+> **`core` 패키지:** 여러 파트가 함께 쓰는 타입을 모은다. 아래 다이어그램에서는 처음 쓰는 파트 쪽에 그려 두었지만 실제 위치는 `com.textrpg.core`다.
+>
+> **`GameContext`:** 한 턴 처리에 필요한 `player`, `floor`, `log`, `turn`, `runResult`를 묶은 객체. 전투(`combat`)와 게임 루프(`game`)의 메서드는 이것들을 하나씩 받는 대신 `GameContext ctx` 하나를 받는다. 한 턴에 필요한 것만 넣는다 (메뉴·슬롯·Profile 제외).
+>
+> **패키지 의존 방향 (순환 금지):** 각 패키지는 자기보다 **아래 줄**의 패키지만 import 한다. 위 줄을 import 하면 순환 참조가 생기므로 PR 리뷰에서 확인한다.
+>
+> | 층 | 패키지 | import 하는 패키지 |
+> |---|---|---|
+> | 7 | `game`, `save`, `ui` | 아래 전부 |
+> | 6 | `combat` | `context`, `monster`, `entity`, `core`, `util` |
+> | 5 | `context` | `meta`, `map`, `entity`, `core` |
+> | 4 | `meta` | `entity` |
+> | 4 | `map` | `monster`, `item`, `core` |
+> | 3 | `monster` | `entity`, `core` |
+> | 2 | `entity` | `item`, `core` |
+> | 1 | `item` | `core` |
+> | 0 | `core`, `util` | 없음 |
+>
+> - `item`은 `Player`를 모른다. `Item.use()`는 `ItemUser` 인터페이스를 받고, `Player`가 이를 구현한다.
+> - `entity`는 `map`을 모른다. `Player.dropItem()`은 꺼낸 아이템을 돌려주기만 하고, 바닥에 놓는 일은 `TurnSystem`이 한다.
+> - `entity`, `item`, `monster`, `map`, `meta`는 `context`를 import 하지 않는다.
 
 ---
 
@@ -224,8 +248,9 @@ classDiagram
         +gainExp(int exp) boolean
         -levelUp()
         +equip(Item item) String
-        +useItem(int index, Floor f) String
-        +dropItem(int index, Floor f) String
+        +restoreMp(int amount) int
+        +useItem(int index) String
+        +dropItem(int index) Item
         +addGold(int amount)
         +regenerate(int turn)
     }
@@ -255,7 +280,7 @@ classDiagram
         +getId() String
         +getDisplayName() String
         +getSymbol() char
-        +use(Player p, Floor f)* String
+        +use(ItemUser user)* String
     }
     class ItemType {
         <<enumeration>>
@@ -268,26 +293,26 @@ classDiagram
     }
     class Weapon {
         -int attackBonus
-        +use(Player p, Floor f) String
+        +use(ItemUser user) String
     }
     class Armor {
         -int defenseBonus
-        +use(Player p, Floor f) String
+        +use(ItemUser user) String
     }
     class Potion {
         -int hpRestore
         -int mpRestore
-        +use(Player p, Floor f) String
+        +use(ItemUser user) String
     }
     class Scroll {
         <<P1>>
         -ScrollEffect effect
-        +use(Player p, Floor f) String
+        +use(ItemUser user) String
     }
     class Food {
         <<P1>>
         -int nutrition
-        +use(Player p, Floor f) String
+        +use(ItemUser user) String
     }
     class FloorItem {
         <<record>>
@@ -322,6 +347,15 @@ classDiagram
     Item <|-- Potion
     Item <|-- Scroll
     Item <|-- Food
+    class ItemUser {
+        <<interface>>
+        +heal(int amount) int
+        +restoreMp(int amount) int
+        +equip(Item item) String
+        +getInventory() Inventory
+    }
+    ItemUser <|.. Player
+    Item ..> ItemUser : use
     Item --> ItemType
     FloorItem --> Item
     FloorItem --> Position
@@ -383,14 +417,14 @@ classDiagram
     }
     class MonsterAI {
         -CombatSystem combat
-        +act(Monster m, Player p, Floor f, MessageLog log)
+        +act(Monster m, GameContext ctx)
         -canSee(Monster m, Player p, Floor f) boolean
         -stepToward(Monster m, Position target, Floor f) Direction
         -wander(Monster m, Floor f)
     }
     class CombatSystem {
         +attack(Entity atk, Entity def, MessageLog log) AttackResult
-        +rewardKill(Player p, Monster m, Floor f, RunResult r, MessageLog log)
+        +rewardKill(Monster m, GameContext ctx)
     }
     class DamageCalculator {
         +rollHit(Entity atk, Entity def)$ boolean
@@ -858,7 +892,7 @@ sequenceDiagram
         TS->>CS: attack(player, monster, log)
         CS-->>TS: AttackResult
         opt killed
-            TS->>CS: rewardKill(player, monster, floor, log)
+            TS->>CS: rewardKill(monster, ctx)
         end
     else 이동 가능
         TS->>F: isWalkable(next)
@@ -868,7 +902,7 @@ sequenceDiagram
     opt 턴 소모
         GM->>TS: runMonsters(player, floor)
         loop 층의 모든 몬스터
-            TS->>AI: act(monster, player, floor, log)
+            TS->>AI: act(monster, ctx)
         end
         GM->>GM: turn++, 사망 확인
     end

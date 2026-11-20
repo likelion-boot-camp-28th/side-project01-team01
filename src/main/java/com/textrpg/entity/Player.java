@@ -2,17 +2,18 @@ package com.textrpg.entity;
 
 import java.util.Optional;
 
+import com.textrpg.core.Position;
 import com.textrpg.item.Armor;
 import com.textrpg.item.Inventory;
 import com.textrpg.item.Item;
+import com.textrpg.item.ItemUser;
 import com.textrpg.item.Weapon;
-import com.textrpg.map.Floor;
 
 /**
  * 플레이어 캐릭터. Entity 를 상속하고, 직업·레벨·경험치·골드·장비·가방을 더 가진다.
  * 실제 공격력/방어력 = 기본 능력치 + 장비 보너스.
  */
-public class Player extends Entity {
+public class Player extends Entity implements ItemUser {
 
     public static final char SYMBOL = '@';
     /** 배고픔 최대치 (P1). */
@@ -79,6 +80,7 @@ public class Player extends Entity {
         return Optional.ofNullable(armor);
     }
 
+    @Override
     public Inventory getInventory() {
         return inventory;
     }
@@ -104,9 +106,18 @@ public class Player extends Entity {
         throw new UnsupportedOperationException("TODO(B): Player.levelUp");
     }
 
+    /** MP 를 회복하고, 실제로 회복된 MP 양을 돌려준다. */
+    @Override
+    public int restoreMp(int amount) {
+        int before = stats.getMp();
+        stats.setMp(before + Math.max(0, amount));
+        return stats.getMp() - before;
+    }
+
     /**
      * 무기나 방어구를 장착한다. 결과 문장을 돌려준다.
      */
+    @Override
     public String equip(Item item) {
         // TODO(B): Weapon 이면 weapon 칸, Armor 이면 armor 칸에 끼우고, 원래 장비는 가방으로
         throw new UnsupportedOperationException("TODO(B): Player.equip");
@@ -115,16 +126,17 @@ public class Player extends Entity {
     /**
      * 가방의 index 번 아이템을 사용한다. 결과 문장을 돌려준다.
      */
-    public String useItem(int index, Floor f) {
-        // TODO(B): inventory.get(index).use(this, f)
+    public String useItem(int index) {
+        // TODO(B): inventory.get(index).use(this)
         throw new UnsupportedOperationException("TODO(B): Player.useItem");
     }
 
     /**
-     * 가방의 index 번 아이템을 발밑에 버린다. 결과 문장을 돌려준다.
+     * 가방의 index 번 아이템을 꺼내서 돌려준다. 바닥에 놓는 일(Floor.addItem)은 TurnSystem 이 한다.
+     * Player 가 Floor 를 알면 entity → map → monster → entity 로 패키지가 서로를 참조하게 되기 때문이다.
      */
-    public String dropItem(int index, Floor f) {
-        // TODO(B): inventory.remove(index) → f.addItem(FloorItem.of(item, pos))
+    public Item dropItem(int index) {
+        // TODO(B): inventory.remove(index)
         throw new UnsupportedOperationException("TODO(B): Player.dropItem");
     }
 

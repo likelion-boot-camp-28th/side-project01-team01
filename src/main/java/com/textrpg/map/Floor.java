@@ -1,6 +1,6 @@
 package com.textrpg.map;
 
-import com.textrpg.entity.Position;
+import com.textrpg.core.Position;
 import com.textrpg.item.FloorItem;
 import com.textrpg.monster.Monster;
 

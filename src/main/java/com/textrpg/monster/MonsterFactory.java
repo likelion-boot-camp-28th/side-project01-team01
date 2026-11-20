@@ -1,6 +1,6 @@
 package com.textrpg.monster;
 
-import com.textrpg.entity.Position;
+import com.textrpg.core.Position;
 
 public class MonsterFactory {
 

@@ -1,6 +1,4 @@
-package com.textrpg.entity;
-
-import com.textrpg.map.Direction;
+package com.textrpg.core;
 
 /**
  * 맵 위의 좌표. x 는 열(0~59), y 는 행(0~19). 불변 객체라서 이동하면 새 Position 을 만든다.
