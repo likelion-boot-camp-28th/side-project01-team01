@@ -18,7 +18,6 @@ public class Armor extends Item {
 
     @Override
     public String use(ItemUser user) {
-        // TODO(B): user.equip(this) 결과 돌려주기
-        throw new UnsupportedOperationException("TODO(B): Armor.use");
+        return user.equip(this);
     }
 }

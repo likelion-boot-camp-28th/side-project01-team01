@@ -28,9 +28,11 @@ public class RunResult {
 
     /** 사망하거나 클리어했을 때 호출한다. */
     public void finish(Player p, boolean victory, String cause) {
-        // TODO(B): finalLevel = p.getLevel(), gold = p.getGold(), this.victory, deathCause 저장
-        //  turns 는 GameContext.getTurn() 값을 받는 방법으로 A와 합의 필요
-        throw new UnsupportedOperationException("TODO(B): RunResult.finish");
+        // TODO(B, A와 합의): turns 는 GameContext.getTurn() 값을 받는 방법으로 A와 합의 필요
+        finalLevel = p.getLevel();
+        gold = p.getGold();
+        this.victory = victory;
+        deathCause = cause;
     }
 
     public int getDeepestFloor() {

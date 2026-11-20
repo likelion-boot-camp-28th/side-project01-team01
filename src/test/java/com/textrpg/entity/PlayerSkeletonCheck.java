@@ -5,6 +5,7 @@ import com.textrpg.item.FloorItem;
 import com.textrpg.item.Inventory;
 import com.textrpg.item.Item;
 import com.textrpg.item.ItemFactory;
+import com.textrpg.item.ItemUser;
 import com.textrpg.item.Weapon;
 import com.textrpg.meta.Profile;
 import com.textrpg.meta.RunResult;
@@ -26,6 +27,9 @@ public final class PlayerSkeletonCheck {
         checkNewPlayer();
         checkInventory();
         checkStatSum();
+        checkLevelUp();
+        checkRegenerate();
+        checkEquipUse();
         checkUpgradeCost();
         checkProfileAndRun();
         checkFloorItem();
@@ -68,6 +72,66 @@ public final class PlayerSkeletonCheck {
         check("방어 = 기본 + 방어구", p.getDefense() == p.getBaseDefense() + p.getArmorDefense());
     }
 
+    private static void checkLevelUp() {
+        Player p = new Player("용사", Job.WARRIOR);
+        check("경험치 10 은 레벨업 아님", !p.gainExp(10) && p.getLevel() == 1 && p.getExp() == 10);
+
+        Player q = new Player("용사", Job.WARRIOR);
+        check("경험치 딱 20 이면 레벨업", q.gainExp(20) && q.getLevel() == 2 && q.getExp() == 0);
+
+        Player r = new Player("용사", Job.WARRIOR);
+        r.gainExp(65);
+        check("경험치 65 → 3레벨, 5 남음", r.getLevel() == 3 && r.getExp() == 5);
+        check("2번 레벨업 → 최대 HP 30+12", r.getStats().getMaxHp() == 42);
+        check("2번 레벨업 → 최대 MP 5+4", r.getStats().getMaxMp() == 9);
+        check("2번 레벨업 → 공격 5+2, 방어 3+2", r.getBaseAttack() == 7 && r.getBaseDefense() == 5);
+    }
+
+    private static void checkRegenerate() {
+        Player p = new Player("용사", Job.WARRIOR);
+        p.takeDamage(5);
+        p.regenerate(9);
+        check("9턴째는 회복 안 함", p.getStats().getHp() == 25);
+        p.regenerate(10);
+        check("10턴째 HP 1 회복", p.getStats().getHp() == 26);
+    }
+
+    private static void checkEquipUse() {
+        Weapon sword = (Weapon) ItemFactory.createById("IRON_SWORD");
+        FakeUser user = new FakeUser();
+        sword.use(user);
+        check("무기 사용 = 장착 요청", user.equipped == sword);
+        Item armor = ItemFactory.createById("LEATHER_ARMOR");
+        armor.use(user);
+        check("방어구 사용 = 장착 요청", user.equipped == armor);
+    }
+
+    /** equip() 이 아직 TODO 라서, 무기·방어구 use() 만 확인하려고 쓰는 가짜 사용자. */
+    private static final class FakeUser implements ItemUser {
+        private Item equipped;
+
+        @Override
+        public int heal(int amount) {
+            return 0;
+        }
+
+        @Override
+        public int restoreMp(int amount) {
+            return 0;
+        }
+
+        @Override
+        public String equip(Item item) {
+            equipped = item;
+            return "장착";
+        }
+
+        @Override
+        public Inventory getInventory() {
+            return new Inventory();
+        }
+    }
+
     private static void checkUpgradeCost() {
         check("MAX_HP 1단계 20", UpgradeType.MAX_HP.costFor(1) == 20);
         check("MAX_HP 최대 5단계", UpgradeType.MAX_HP.getMaxLevel() == 5);
@@ -85,6 +149,20 @@ public final class PlayerSkeletonCheck {
         run.reachFloor(2);
         check("처치 1", run.getKills() == 1);
         check("가장 깊은 층 3", run.getDeepestFloor() == 3);
+
+        check("파편 0 이면 강화 못 삼", !profile.canBuy(UpgradeType.MAX_HP));
+
+        Player p = new Player("용사", Job.WARRIOR);
+        p.gainExp(20);
+        p.addGold(15);
+        run.finish(p, false, "고블린에게 사망");
+        check("끝난 판 레벨 2, 골드 15 저장", run.getFinalLevel() == 2 && run.getGold() == 15);
+        check("끝난 판 패배, 사망 원인 저장",
+                !run.isVictory() && run.getDeathCause().equals("고블린에게 사망"));
+
+        RunResult clear = new RunResult();
+        clear.finish(p, true, "");
+        check("클리어면 victory true", clear.isVictory());
     }
 
     private static void checkFloorItem() {

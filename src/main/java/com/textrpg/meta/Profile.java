@@ -60,8 +60,7 @@ public class Profile {
 
     /** 다음 단계를 살 수 있는지 (최대 단계 전이고 파편이 충분한지). */
     public boolean canBuy(UpgradeType t) {
-        // TODO(B): getLevel(t) < t.getMaxLevel() && shards >= t.costFor(getLevel(t) + 1)
-        throw new UnsupportedOperationException("TODO(B): Profile.canBuy");
+        return getLevel(t) < t.getMaxLevel() && shards >= t.costFor(getLevel(t) + 1);
     }
 
     /** 다음 단계를 산다. 샀으면 true. 직업 해금 강화면 unlockedJobs 에도 넣는다. */
