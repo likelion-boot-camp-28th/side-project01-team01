@@ -1,8 +1,5 @@
 package com.textrpg.item;
 
-import com.textrpg.entity.Player;
-import com.textrpg.map.Floor;
-
 /**
  * 물약. 마시면 HP·MP 를 회복하고 사라진다.
  */
@@ -26,8 +23,8 @@ public class Potion extends Item {
     }
 
     @Override
-    public String use(Player p, Floor f) {
-        // TODO(B): p.heal(hpRestore), MP 회복, 가방에서 제거 후 "HP 를 10 회복했다." 같은 문장 돌려주기
+    public String use(ItemUser user) {
+        // TODO(B): user.heal(hpRestore), user.restoreMp(mpRestore), user.getInventory() 에서 제거 후 "HP 를 10 회복했다." 같은 문장 돌려주기
         throw new UnsupportedOperationException("TODO(B): Potion.use");
     }
 }
