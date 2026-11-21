@@ -9,6 +9,7 @@ import com.textrpg.item.ItemUser;
 import com.textrpg.item.Weapon;
 import com.textrpg.meta.Profile;
 import com.textrpg.meta.RunResult;
+import com.textrpg.meta.ShardCalculator;
 import com.textrpg.meta.UpgradeType;
 
 /**
@@ -32,6 +33,7 @@ public final class PlayerSkeletonCheck {
         checkEquipUse();
         checkUpgradeCost();
         checkProfileAndRun();
+        checkShards();
         checkFloorItem();
 
         System.out.println("통과 " + passed + " / 실패 " + failed);
@@ -163,6 +165,38 @@ public final class PlayerSkeletonCheck {
         RunResult clear = new RunResult();
         clear.finish(p, true, "");
         check("클리어면 victory true", clear.isVictory());
+    }
+
+    private static void checkShards() {
+        Player p = new Player("용사", Job.WARRIOR);
+        p.gainExp(120);
+        p.addGold(57);
+        RunResult run = new RunResult();
+        run.reachFloor(3);
+        for (int i = 0; i < 14; i++) {
+            run.addKill();
+        }
+        run.finish(p, false, "오크에게 사망");
+        check("예시: 3층·처치 14·레벨 4·골드 57 → 파편 61",
+                ShardCalculator.calculate(run, Profile.newProfile()) == 61);
+
+        RunResult clear = new RunResult();
+        clear.reachFloor(5);
+        clear.finish(p, true, "");
+        check("클리어 보너스 100: 5층·레벨 4·골드 57 → 50 + 12 + 5 + 100 = 167",
+                ShardCalculator.calculate(clear, Profile.newProfile()) == 167);
+
+        Profile profile = Profile.newProfile();
+        profile.recordRun(run, 61);
+        profile.recordRun(clear, 167);
+        RunResult shallow = new RunResult();
+        shallow.reachFloor(2);
+        shallow.finish(p, false, "박쥐에게 사망");
+        profile.recordRun(shallow, 0);
+        check("파편 누적 61 + 167", profile.getShards() == 228);
+        check("판 수 3, 처치 누적 14, 클리어 1",
+                profile.getTotalRuns() == 3 && profile.getTotalKills() == 14 && profile.getClears() == 1);
+        check("최고 층은 5 그대로 (2층 판이 덮어쓰지 않음)", profile.getBestFloor() == 5);
     }
 
     private static void checkFloorItem() {
