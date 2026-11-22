@@ -34,6 +34,7 @@ public final class PlayerSkeletonCheck {
         checkUpgradeCost();
         checkProfileAndRun();
         checkShards();
+        checkBuy();
         checkFloorItem();
 
         System.out.println("통과 " + passed + " / 실패 " + failed);
@@ -197,6 +198,20 @@ public final class PlayerSkeletonCheck {
         check("판 수 3, 처치 누적 14, 클리어 1",
                 profile.getTotalRuns() == 3 && profile.getTotalKills() == 14 && profile.getClears() == 1);
         check("최고 층은 5 그대로 (2층 판이 덮어쓰지 않음)", profile.getBestFloor() == 5);
+    }
+
+    private static void checkBuy() {
+        Profile profile = Profile.newProfile();
+        check("파편 0 이면 못 삼", !profile.buy(UpgradeType.MAX_HP) && profile.getLevel(UpgradeType.MAX_HP) == 0);
+
+        profile.recordRun(new RunResult(), 80);
+        check("파편 80 → 최대 HP 1단계 구매(20)", profile.buy(UpgradeType.MAX_HP));
+        check("단계 1, 파편 60 남음", profile.getLevel(UpgradeType.MAX_HP) == 1 && profile.getShards() == 60);
+
+        check("마법사 해금 구매(60)", profile.buy(UpgradeType.UNLOCK_MAGE));
+        check("마법사 해금됨, 파편 0", profile.isUnlocked(Job.MAGE) && profile.getShards() == 0);
+        check("도적은 아직 잠김", !profile.isUnlocked(Job.ROGUE));
+        check("해금은 1단계가 최대라 또 못 삼", !profile.buy(UpgradeType.UNLOCK_MAGE));
     }
 
     private static void checkFloorItem() {

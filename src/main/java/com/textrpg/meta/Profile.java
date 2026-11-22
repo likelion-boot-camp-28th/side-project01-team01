@@ -73,8 +73,19 @@ public class Profile {
      * 다음 단계를 산다. 샀으면 true. 직업 해금 강화면 unlockedJobs 에도 넣는다.
      */
     public boolean buy(UpgradeType t) {
-        // TODO(B): canBuy 확인 → 파편 차감 → 단계 +1 → UNLOCK_* 이면 직업 해금
-        throw new UnsupportedOperationException("TODO(B): Profile.buy");
+        if (!canBuy(t)) {
+            return false;
+        }
+        int nextLevel = getLevel(t) + 1;
+        shards -= t.costFor(nextLevel);
+        upgradeLevels.put(t, nextLevel);
+        if (t == UpgradeType.UNLOCK_MAGE) {
+            unlockedJobs.add(Job.MAGE);
+        }
+        if (t == UpgradeType.UNLOCK_ROGUE) {
+            unlockedJobs.add(Job.ROGUE);
+        }
+        return true;
     }
 
     /**
