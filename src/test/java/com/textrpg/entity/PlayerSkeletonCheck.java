@@ -35,6 +35,7 @@ public final class PlayerSkeletonCheck {
         checkUpgradeCost();
         checkProfileAndRun();
         checkShards();
+        checkBreakdown();
         checkBuy();
         checkFloorItem();
 
@@ -213,6 +214,33 @@ public final class PlayerSkeletonCheck {
         check("판 수 3, 처치 누적 14, 클리어 1",
                 profile.getTotalRuns() == 3 && profile.getTotalKills() == 14 && profile.getClears() == 1);
         check("최고 층은 5 그대로 (2층 판이 덮어쓰지 않음)", profile.getBestFloor() == 5);
+    }
+
+    private static void checkBreakdown() {
+        Player p = new Player("용사", Job.WARRIOR);
+        p.gainExp(120);
+        p.addGold(57);
+        RunResult run = new RunResult();
+        run.reachFloor(3);
+        for (int i = 0; i < 14; i++) {
+            run.addKill();
+        }
+        run.finish(p, false, "오크에게 사망");
+        java.util.List<String> lines = ShardCalculator.breakdown(run, Profile.newProfile());
+        check("내역 5줄 (층·처치·레벨·골드·합계)", lines.size() == 5);
+        check("첫 줄: 도달 층 3 × 10 = 30", lines.get(0).equals("도달 층 3 × 10 = 30"));
+        check("처치 줄 = 14", lines.get(1).startsWith("처치 14") && lines.get(1).endsWith("= 14"));
+        check("레벨 줄 = 12", lines.get(2).startsWith("레벨 4") && lines.get(2).endsWith("= 12"));
+        check("골드 줄 = 5", lines.get(3).startsWith("골드 57") && lines.get(3).endsWith("= 5"));
+        check("마지막 줄: 합계 = 61", lines.get(4).equals("합계 = 61"));
+
+        RunResult clear = new RunResult();
+        clear.reachFloor(5);
+        clear.finish(p, true, "");
+        java.util.List<String> clearLines = ShardCalculator.breakdown(clear, Profile.newProfile());
+        check("클리어하면 보너스 줄이 하나 더 (6줄)", clearLines.size() == 6);
+        check("보너스 줄에 100", clearLines.get(4).contains("100"));
+        check("클리어 합계 = 167", clearLines.get(5).equals("합계 = 167"));
     }
 
     private static void checkBuy() {
