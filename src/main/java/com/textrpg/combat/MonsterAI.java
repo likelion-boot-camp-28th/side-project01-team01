@@ -10,7 +10,9 @@ import com.textrpg.entity.Player;
 import com.textrpg.map.Floor;
 import com.textrpg.monster.Boss;
 import com.textrpg.monster.Monster;
+import com.textrpg.monster.MonsterFactory;
 import com.textrpg.monster.MonsterType;
+import com.textrpg.monster.PileOfBones;
 import com.textrpg.util.RandomUtil;
 
 /**
@@ -47,6 +49,9 @@ public class MonsterAI {
             }
             if (ctx.getTurn() % ZERO_SPEED_ACTION_INTERVAL == 0 && monster.getType().getSpeed() == 0) {
                 moveOrAttack(monster, player, floor, log);
+            }
+            if (monster instanceof PileOfBones bones) {
+                revive(bones, ctx);
             }
         }
     }
@@ -130,6 +135,14 @@ public class MonsterAI {
         Position newPos = monster.getPos().move(direction);
         if (floor.isWalkable(newPos) && floor.getMonsterAt(newPos) == null) {
             monster.setPos(newPos);
+        }
+    }
+
+    private void revive(PileOfBones bones, GameContext ctx) {
+        if (bones.isTimeToRevive(ctx.getTurn())) {
+            ctx.getFloor().removeMonster(bones);
+            ctx.getFloor().addMonster(MonsterFactory.create(MonsterType.SKELETON, bones.getPos()));
+            ctx.getLog().add("뼈 무더기가 해골 병사로 부활했습니다.");
         }
     }
 }
