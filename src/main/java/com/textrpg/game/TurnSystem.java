@@ -1,9 +1,18 @@
 package com.textrpg.game;
 
+import com.textrpg.combat.AttackResult;
 import com.textrpg.combat.CombatSystem;
 import com.textrpg.combat.MonsterAI;
 import com.textrpg.context.GameContext;
 import com.textrpg.core.Direction;
+import com.textrpg.core.MessageLog;
+import com.textrpg.core.Position;
+import com.textrpg.entity.Player;
+import com.textrpg.item.FloorItem;
+import com.textrpg.item.Inventory;
+import com.textrpg.item.Item;
+import com.textrpg.map.Floor;
+import com.textrpg.monster.Boss;
 import com.textrpg.monster.Monster;
 
 /**
@@ -12,6 +21,8 @@ import com.textrpg.monster.Monster;
  *
  * <p>가방 보기(INVENTORY), 도움말(HELP), 저장 후 종료(SAVE_QUIT)는 턴을 쓰지 않는 화면 명령이라
  * GameManager 가 직접 처리하고 이 클래스로 넘기지 않는다.
+ *
+ * <p>턴을 쓰지 못한 행동(NO_TURN)은 이유를 MessageLog 에 남긴다. 아무 반응이 없으면 입력이 무시된 것처럼 보이기 때문이다.
  */
 public class TurnSystem {
 
@@ -30,7 +41,7 @@ public class TurnSystem {
      * <ol>
      *   <li>플레이어 행동 (이동·공격, 줍기, 사용, 장착, 버리기, 내려가기, 대기)</li>
      *   <li>TURN_USED 이면 모든 몬스터 행동. 플레이어가 쓰러지면 DIED</li>
-     *   <li>턴 마무리: ctx.nextTurn(), 자연 회복</li>
+     *   <li>턴 마무리: ctx.nextTurn(), 자연 회복. 계단을 내려간 턴(DESCENDED)도 턴 수에 넣는다</li>
      * </ol>
      *
      * @param cmd 실행할 명령. INVENTORY, HELP, SAVE_QUIT 는 받지 않는다
@@ -39,8 +50,22 @@ public class TurnSystem {
      * @throws IllegalArgumentException 화면 명령(INVENTORY, HELP, SAVE_QUIT)을 넘겼을 때
      */
     public TurnOutcome playTurn(Command cmd, GameContext ctx) {
-        // TODO(A): executePlayer → TURN_USED 면 runMonsters → 살아 있으면 endOfTurn
-        throw new UnsupportedOperationException("TurnSystem.playTurn 은 아직 구현되지 않았습니다.");
+        deathCause = "";
+        TurnOutcome playerOutcome = executePlayer(cmd, ctx);
+        return switch (playerOutcome) {
+            case TURN_USED -> {
+                if (runMonsters(ctx) == TurnOutcome.DIED) {
+                    yield TurnOutcome.DIED;
+                }
+                endOfTurn(ctx);
+                yield TurnOutcome.TURN_USED;
+            }
+            case DESCENDED -> {
+                endOfTurn(ctx);
+                yield TurnOutcome.DESCENDED;
+            }
+            case NO_TURN, VICTORY, DIED -> playerOutcome;
+        };
     }
 
     /** 플레이어가 쓰러졌을 때 원인 (몬스터 이름). DIED 가 아니면 빈 문자열. RunResult.finish() 에 넘긴다. */
@@ -50,8 +75,16 @@ public class TurnSystem {
 
     /** 명령 종류에 따라 플레이어 행동을 실행한다. */
     private TurnOutcome executePlayer(Command cmd, GameContext ctx) {
-        // TODO(A): switch (cmd.type()) → tryMove / pickUp / useItem / equip / drop / descend / WAIT 는 TURN_USED
-        throw new UnsupportedOperationException("TurnSystem.executePlayer 는 아직 구현되지 않았습니다.");
+        return switch (cmd.type()) {
+            case MOVE -> tryMove(cmd.direction(), ctx);
+            case PICK_UP -> pickUp(ctx);
+            case USE, EQUIP -> useOrEquip(cmd, ctx);
+            case DROP -> drop(cmd.itemIndex(), ctx);
+            case DESCEND -> descend(ctx);
+            case WAIT -> TurnOutcome.TURN_USED;
+            case INVENTORY, HELP, SAVE_QUIT -> throw new IllegalArgumentException(
+                    "턴을 쓰지 않는 화면 명령은 GameManager 가 처리합니다: " + cmd.type());
+        };
     }
 
     /**
@@ -60,30 +93,66 @@ public class TurnSystem {
      * @return 벽이면 NO_TURN, 이동·공격이면 TURN_USED, 공격으로 보스를 쓰러뜨리면 VICTORY
      */
     private TurnOutcome tryMove(Direction d, GameContext ctx) {
-        // TODO(A): next = pos.move(d) → floor.getMonsterAt(next) 있으면 attack
-        //  → 없으면 floor.isWalkable(next) 일 때 player.setPos(next)
-        throw new UnsupportedOperationException("TurnSystem.tryMove 는 아직 구현되지 않았습니다.");
+        Player player = ctx.getPlayer();
+        Floor floor = ctx.getFloor();
+        Position next = player.getPos().move(d);
+
+        Monster target = floor.getMonsterAt(next);
+        if (target != null) {
+            return attack(target, ctx);
+        }
+        if (!floor.isWalkable(next)) {
+            ctx.getLog().add("벽에 막혀 움직일 수 없습니다.");
+            return TurnOutcome.NO_TURN;
+        }
+        player.setPos(next);
+        return TurnOutcome.TURN_USED;
     }
 
     /**
-     * 몬스터를 공격하고, 쓰러뜨렸으면 C 파트의 rewardKill 로 보상(경험치·골드·처치 수)을 준다.
+     * 몬스터를 공격하고, 쓰러뜨렸으면 C 파트의 rewardKill 로 처치를 마무리한다.
+     * rewardKill 이 처치 수·경험치·골드 보상과 층에서 몬스터 제거(floor.removeMonster)까지 하므로 여기서는 부르지 않는다.
+     * 보스 처치로 게임이 끝나는지는 이 클래스가 정한다.
      *
      * @return 보스를 쓰러뜨렸으면 VICTORY, 아니면 TURN_USED
      */
     private TurnOutcome attack(Monster target, GameContext ctx) {
-        // TODO(A): combat.attack(player, target, log) → killed 면 floor.removeMonster + combat.rewardKill(target, ctx)
-        //  → target 이 Boss 면 VICTORY
-        throw new UnsupportedOperationException("TurnSystem.attack 은 아직 구현되지 않았습니다.");
+        AttackResult result = combat.attack(ctx.getPlayer(), target, ctx.getLog());
+        if (!result.killed()) {
+            return TurnOutcome.TURN_USED;
+        }
+        combat.rewardKill(target, ctx);
+        return target instanceof Boss ? TurnOutcome.VICTORY : TurnOutcome.TURN_USED;
     }
 
     /**
-     * 발밑의 골드나 아이템을 줍는다.
+     * 발밑의 골드나 아이템을 줍는다. 아이템은 가방에 넣은 뒤에 바닥에서 지운다 (가방이 가득 차면 바닥에 그대로 남음).
      *
      * @return 주웠으면 TURN_USED, 발밑이 비었거나 가방이 가득 차면 NO_TURN
      */
     private TurnOutcome pickUp(GameContext ctx) {
-        // TODO(A): floor.getItemAt(pos) → 골드면 player.addGold, 아이템이면 inventory.add → floor.removeItem
-        throw new UnsupportedOperationException("TurnSystem.pickUp 은 아직 구현되지 않았습니다.");
+        Player player = ctx.getPlayer();
+        Floor floor = ctx.getFloor();
+        MessageLog log = ctx.getLog();
+
+        FloorItem floorItem = floor.getItemAt(player.getPos());
+        if (floorItem == null) {
+            log.add("주울 것이 없습니다.");
+            return TurnOutcome.NO_TURN;
+        }
+        if (floorItem.isGold()) {
+            player.addGold(floorItem.goldAmount());
+            floor.removeItem(floorItem);
+            log.add(floorItem.goldAmount() + " 골드를 주웠습니다.");
+            return TurnOutcome.TURN_USED;
+        }
+        if (!player.getInventory().add(floorItem.item())) {
+            log.add("가방이 가득 찼습니다.");
+            return TurnOutcome.NO_TURN;
+        }
+        floor.removeItem(floorItem);
+        log.add(floorItem.item().getDisplayName() + "을(를) 주웠습니다.");
+        return TurnOutcome.TURN_USED;
     }
 
     /**
@@ -92,43 +161,96 @@ public class TurnSystem {
      * @return 번호가 가방 범위를 벗어나면 NO_TURN, 아니면 TURN_USED
      */
     private TurnOutcome useOrEquip(Command cmd, GameContext ctx) {
-        // TODO(A): 번호 검사 → USE 면 player.useItem(i), EQUIP 이면 player.equip(inventory.get(i)) → log.add(결과)
-        throw new UnsupportedOperationException("TurnSystem.useOrEquip 은 아직 구현되지 않았습니다.");
+        Player player = ctx.getPlayer();
+        int index = cmd.itemIndex();
+        if (!hasItemAt(player.getInventory(), index, ctx.getLog())) {
+            return TurnOutcome.NO_TURN;
+        }
+        if (cmd.type() == CommandType.USE) {
+            ctx.getLog().add(player.useItem(index));
+            return TurnOutcome.TURN_USED;
+        }
+        // TODO(A, B와 합의): EQUIP — Player.equip 계약(가방에서 빼는 쪽, 장착 불가 아이템의 턴 소모) 확정 후 구현
+        ctx.getLog().add("아직 장착 기능을 쓸 수 없습니다.");
+        return TurnOutcome.NO_TURN;
     }
 
     /**
      * 가방의 아이템을 발밑에 버린다. Player 는 Floor 를 모르므로(패키지 의존 방향) 바닥에 놓는 일은 여기서 한다.
+     * 한 칸에는 바닥 아이템을 하나만 둔다 (Floor.getItemAt 이 하나만 돌려주므로 겹치면 아래 것을 줍지 못함).
      *
-     * @return 번호가 가방 범위를 벗어나면 NO_TURN, 아니면 TURN_USED
+     * @return 번호가 가방 범위를 벗어나거나 발밑에 이미 물건이 있으면 NO_TURN, 아니면 TURN_USED
      */
     private TurnOutcome drop(int index, GameContext ctx) {
-        // TODO(A): item = player.dropItem(index) → floor.addItem(FloorItem.of(item, player.getPos()))
-        throw new UnsupportedOperationException("TurnSystem.drop 은 아직 구현되지 않았습니다.");
+        Player player = ctx.getPlayer();
+        Floor floor = ctx.getFloor();
+        MessageLog log = ctx.getLog();
+
+        if (!hasItemAt(player.getInventory(), index, log)) {
+            return TurnOutcome.NO_TURN;
+        }
+        if (floor.getItemAt(player.getPos()) != null) {
+            log.add("여기에는 이미 물건이 있습니다.");
+            return TurnOutcome.NO_TURN;
+        }
+        Item item = player.dropItem(index);
+        floor.addItem(FloorItem.of(item, player.getPos()));
+        log.add(item.getDisplayName() + "을(를) 버렸습니다.");
+        return TurnOutcome.TURN_USED;
     }
 
     /**
      * 계단 위에서 내려간다. 새 층을 만드는 일은 GameManager 가 한다.
+     * 보스층은 계단이 없어(getStairs() 가 비어 있음) 항상 NO_TURN 이다.
      *
      * @return 계단 위면 DESCENDED, 아니면 NO_TURN
      */
     private TurnOutcome descend(GameContext ctx) {
-        // TODO(A): floor.getStairs() 가 player.getPos() 와 같으면 DESCENDED
-        throw new UnsupportedOperationException("TurnSystem.descend 는 아직 구현되지 않았습니다.");
+        Position pos = ctx.getPlayer().getPos();
+        boolean onStairs = ctx.getFloor().getStairs().filter(pos::equals).isPresent();
+        if (!onStairs) {
+            ctx.getLog().add("여기에는 내려갈 계단이 없습니다.");
+            return TurnOutcome.NO_TURN;
+        }
+        return TurnOutcome.DESCENDED;
     }
 
     /**
      * 층의 모든 몬스터가 한 번씩 행동한다. 도중에 플레이어가 쓰러지면 멈추고 deathCause 를 남긴다.
+     * getMonsters() 는 복사본이라 행동 도중 몬스터가 층에서 빠져도 순회가 깨지지 않는다.
      *
      * @return 플레이어가 쓰러졌으면 DIED, 아니면 TURN_USED
      */
     private TurnOutcome runMonsters(GameContext ctx) {
-        // TODO(A): floor.getMonsters() 순회 (죽은 몬스터 건너뜀) → monsterAI.act(m, ctx) → !player.isAlive() 면 DIED
-        throw new UnsupportedOperationException("TurnSystem.runMonsters 는 아직 구현되지 않았습니다.");
+        Player player = ctx.getPlayer();
+        for (Monster m : ctx.getFloor().getMonsters()) {
+            if (!m.isAlive()) {
+                continue;
+            }
+            monsterAI.act(m, ctx);
+            if (!player.isAlive()) {
+                deathCause = m.getName();
+                return TurnOutcome.DIED;
+            }
+        }
+        return TurnOutcome.TURN_USED;
     }
 
     /** 턴 수를 늘리고 자연 회복을 적용한다. */
     private void endOfTurn(GameContext ctx) {
-        // TODO(A): player.regenerate(ctx.nextTurn())
-        throw new UnsupportedOperationException("TurnSystem.endOfTurn 은 아직 구현되지 않았습니다.");
+        ctx.getPlayer().regenerate(ctx.nextTurn());
+    }
+
+    /**
+     * 가방에 index 번 아이템이 있는지. 없으면 안내 문장을 남긴다. 음수 번호는 Command 가 이미 막는다.
+     *
+     * @return index 가 가방 범위 안이면 true
+     */
+    private boolean hasItemAt(Inventory inventory, int index, MessageLog log) {
+        if (index >= inventory.size()) {
+            log.add((index + 1) + "번 칸에는 아이템이 없습니다.");
+            return false;
+        }
+        return true;
     }
 }

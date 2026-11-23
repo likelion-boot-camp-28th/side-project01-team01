@@ -911,8 +911,11 @@ sequenceDiagram
         TS->>CS: attack(player, monster, log)
         CS-->>TS: AttackResult
         opt killed
-            TS->>F: removeMonster(monster)
             TS->>CS: rewardKill(monster, ctx)
+            CS->>F: removeMonster(monster)
+            opt 보스 처치
+                TS-->>GM: VICTORY
+            end
         end
     else 이동 가능
         TS->>F: isWalkable(next)
