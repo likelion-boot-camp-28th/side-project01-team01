@@ -43,6 +43,7 @@ public class MonsterAI {
             int actionCount = monster.getType().getSpeed();
             if (monster instanceof Boss) {
                 actionCount = ((Boss) monster).attacksPerTurn();
+                ((Boss) monster).restore();
             }
 
             if (monster.getType() == MonsterType.SHADOW_KNIGHT) {

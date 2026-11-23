@@ -18,7 +18,7 @@ public enum MonsterType {
     ORC("오크", 'O', 3, 5, 40, 9, 4, 18, 18, 1),
     SPIDER("독거미", 'V', 4, 5, 18, 8, 2, 16, 16, 1),
     SHADOW_KNIGHT("그림자 기사", 'D', 4, 5, 32, 11, 6, 25, 25, 1),
-    ABYSS_WARDEN("어둠의 파수꾼", '&', 5, 5, 120, 14, 7, 0, 0, 1);
+    ABYSS_WARDEN("어둠의 파수꾼", '&', 5, 5, 120, 14, 7, 0, 0, 2);
 
     private static final int BASE_HIT_RATE = 70;
     private static final int HIT_RATE_PER_SPEED = 15;
