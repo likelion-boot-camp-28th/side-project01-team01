@@ -11,15 +11,23 @@ import com.textrpg.item.Weapon;
 
 /**
  * 플레이어 캐릭터. Entity 를 상속하고, 직업·레벨·경험치·골드·장비·가방을 더 가진다.
- * 실제 공격력/방어력 = 기본 능력치 + 장비 보너스.
+ * 실제 공격력 = 기본 공격력 + 무기 공격력, 실제 방어력 = 기본 방어력 + 방어구 방어력.
  */
 public class Player extends Entity implements ItemUser {
-
     public static final char SYMBOL = '@';
-    /** 배고픔 최대치 (P1). */
+    /**
+     * 배고픔 최대치 (P1).
+     */
     public static final int MAX_HUNGER = 100;
-    /** 이 턴 수마다 HP 1 회복 (자연 회복). */
+    /**
+     * 이 턴 수마다 HP 1 회복 (자연 회복).
+     */
     public static final int REGEN_INTERVAL = 10;
+    public static final int LEVEL_UP_HP = 6;
+    public static final int LEVEL_UP_MP = 2;
+    public static final int LEVEL_UP_ATTACK = 1;
+    public static final int LEVEL_UP_DEFENSE = 1;
+    public static final int EXP_PER_LEVEL = 20;
 
     private final Job job;
     private int level = 1;
@@ -29,7 +37,9 @@ public class Player extends Entity implements ItemUser {
     private Weapon weapon;
     private Armor armor;
     private final Inventory inventory = new Inventory();
-    /** 경험치 배율. 영구 강화(배움의 축복, P1)가 Profile.applyTo()다. 에서 바꾼 */
+    /**
+     * 경험치 배율. 영구 강화(배움의 축복, P1)가 Profile.applyTo()다. 에서 바꾼
+     */
     private double expMultiplier = 1.0;
 
     /**
@@ -40,16 +50,48 @@ public class Player extends Entity implements ItemUser {
         this.job = job;
     }
 
+    /**
+     * 최종 공격력 = 기본 공격력 + 무기 공격력. 전투(DamageCalculator)는 이 값을 쓴다.
+     */
     @Override
     public int getAttack() {
-        int bonus = (weapon == null) ? 0 : weapon.getAttackBonus();
-        return stats.getAttack() + bonus;
+        return getBaseAttack() + getWeaponAttack();
     }
 
+    /**
+     * 최종 방어력 = 기본 방어력 + 방어구 방어력.
+     */
     @Override
     public int getDefense() {
-        int bonus = (armor == null) ? 0 : armor.getDefenseBonus();
-        return stats.getDefense() + bonus;
+        return getBaseDefense() + getArmorDefense();
+    }
+
+    /**
+     * 장비를 뺀 기본 공격력 (직업 시작값 + 레벨업 + 영구 강화).
+     */
+    public int getBaseAttack() {
+        return getStats().getAttack();
+    }
+
+    /**
+     * 무기로 늘어난 공격력. 맨손이면 0.
+     */
+    public int getWeaponAttack() {
+        return (weapon == null) ? 0 : weapon.getAttackBonus();
+    }
+
+    /**
+     * 장비를 뺀 기본 방어력.
+     */
+    public int getBaseDefense() {
+        return getStats().getDefense();
+    }
+
+    /**
+     * 방어구로 늘어난 방어력. 방어구가 없으면 0.
+     */
+    public int getArmorDefense() {
+        return (armor == null) ? 0 : armor.getDefenseBonus();
     }
 
     public Job getJob() {
@@ -97,18 +139,31 @@ public class Player extends Entity implements ItemUser {
      * 경험치를 얻는다. 레벨이 올랐으면 true.
      */
     public boolean gainExp(int amount) {
-        // TODO(B): amount * expMultiplier 만큼 exp 를 더하고, 기준을 넘으면 levelUp() 호출
-        throw new UnsupportedOperationException("TODO(B): Player.gainExp");
+        exp += (int) (amount * expMultiplier);
+        boolean leveledUp = false;
+
+        while (exp >= (level * EXP_PER_LEVEL)) {
+            exp -= (level * EXP_PER_LEVEL);
+            levelUp();
+            leveledUp = true;
+        }
+        return leveledUp;
     }
 
     private void levelUp() {
-        // TODO(B): level 1 증가, 최대 HP·공격·방어 상승 (상승량은 상수로)
-        throw new UnsupportedOperationException("TODO(B): Player.levelUp");
+        level++;
+        getStats().addMaxHp(LEVEL_UP_HP);
+        getStats().addMaxMp(LEVEL_UP_MP);
+        getStats().setAttack(getStats().getAttack() + LEVEL_UP_ATTACK);
+        getStats().setDefense(getStats().getDefense() + LEVEL_UP_DEFENSE);
     }
 
-    /** MP 를 회복하고, 실제로 회복된 MP 양을 돌려준다. */
+    /**
+     * MP 를 회복하고, 실제로 회복된 MP 양을 돌려준다.
+     */
     @Override
     public int restoreMp(int amount) {
+        Stats stats = getStats();
         int before = stats.getMp();
         stats.setMp(before + Math.max(0, amount));
         return stats.getMp() - before;
@@ -144,9 +199,9 @@ public class Player extends Entity implements ItemUser {
      * 턴마다 호출한다. REGEN_INTERVAL 턴마다 HP 1 회복 (배고픔은 P1).
      */
     public void regenerate(int turn) {
-        // TODO(B): turn % REGEN_INTERVAL == 0 이면 heal(1)
-        throw new UnsupportedOperationException("TODO(B): Player.regenerate");
+        if (turn % REGEN_INTERVAL == 0) {
+            heal(1);
+        }
     }
-
     // TODO(B, A와 합의): 세이브 복원용으로 level, exp, gold, hp 등을 넣는 방법 (SaveManager 2차에서 필요)
 }

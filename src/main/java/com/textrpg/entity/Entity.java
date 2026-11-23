@@ -5,13 +5,15 @@ import com.textrpg.core.Position;
 /**
  * 맵 위에 존재하는 생명체(플레이어, 몬스터)의 공통 부모.
  * 장비 보너스 등이 붙는 실제 공격력·방어력은 하위 클래스가 getAttack()/getDefense() 로 계산한다.
+ * 필드는 모두 private 이므로 하위 클래스도 getStats() 같은 getter 로 읽는다.
+ * 생성자만 protected 로 둔다 (private 이면 Player·Monster 가 super(...) 를 부를 수 없다).
  */
 public abstract class Entity {
 
-    protected final String name;
-    protected final char symbol;
-    protected Position pos;
-    protected final Stats stats;
+    private final String name;
+    private final char symbol;
+    private Position pos;
+    private final Stats stats;
 
     protected Entity(String name, char symbol, Position pos, Stats stats) {
         this.name = name;

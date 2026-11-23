@@ -14,10 +14,15 @@ public final class ItemFactory {
      * 지금은 테스트용 3종만 있다. 나머지 아이템은 TODO(B).
      */
     public static Item createById(String id) {
+        // 인자 순서: id, 이름, 설명, 최소 드랍 층, 최대 드랍 층, 수치...
+        // 드랍 층수는 MonsterType 처럼 1~5층 기준 (5층은 보스층).
         return switch (id) {
-            case "IRON_SWORD" -> new Weapon("IRON_SWORD", "철 검", 3);
-            case "LEATHER_ARMOR" -> new Armor("LEATHER_ARMOR", "가죽 갑옷", 2);
-            case "HP_POTION_S" -> new Potion("HP_POTION_S", "작은 치유 물약", 10, 0);
+            case "IRON_SWORD" -> new Weapon("IRON_SWORD", "철 검",
+                    "평범한 철로 만든 검. 공격력 +3", 1, 3, 3);
+            case "LEATHER_ARMOR" -> new Armor("LEATHER_ARMOR", "가죽 갑옷",
+                    "질긴 가죽으로 만든 갑옷. 방어력 +2", 1, 3, 2);
+            case "HP_POTION_S" -> new Potion("HP_POTION_S", "작은 치유 물약",
+                    "마시면 HP 를 10 회복한다.", 1, 5, 10, 0);
             default -> throw new IllegalArgumentException("모르는 아이템 id: " + id);
         };
     }

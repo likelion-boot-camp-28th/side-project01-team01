@@ -30,12 +30,12 @@ classDiagram
     Profile ..> Player : applyTo
     SaveManager ..> SlotData
     SlotData --> Profile
-    SlotData --> RunData
+    SlotData --> GameContext
 ```
 
 | 파트 | 담당 | 클래스 |
 |---|---|---|
-| A | 게임 루프·UI·세이브 | Main, GameManager, GameState, TurnSystem, Command, CommandParser, ConsoleView, MapRenderer, InputHandler, RandomUtil, SaveManager, SlotData, RunData, SaveFileParser, SaveLoadException, RankingManager(P1) |
+| A | 게임 루프·UI·세이브 | Main, GameManager, GameState, TurnSystem, Command, CommandParser, ConsoleView, MapRenderer, InputHandler, RandomUtil, SaveManager, SlotData, SaveFileParser, SaveFileWriter, SaveLoadException, TurnOutcome, RankingManager(P1) |
 | B | 캐릭터·아이템·영구 성장 | Entity, Player, Job, Stats, Item, Weapon, Armor, Potion, Scroll(P1), Food(P1), ItemType, ItemUser, Inventory, FloorItem, ItemFactory, ItemIdentifier(P1), Profile, UpgradeType, RunResult, ShardCalculator |
 | C | 몬스터·전투 | Monster, Boss, MonsterType, MonsterFactory, MonsterAI, CombatSystem, DamageCalculator, AttackResult |
 | D | 맵·생성 | Floor, Tile, Room, DungeonGenerator, FieldOfView(P1), DungeonGeneratorCheck(검증용, `src/test/java`) |
@@ -76,34 +76,31 @@ classDiagram
     }
     class GameManager {
         -GameState state
-        -int saveSlot
+        -int slot
         -Profile profile
-        -Player player
-        -Floor floor
-        -int turn
-        -RunResult runResult
+        -GameContext run
         -TurnSystem turnSystem
-        -MessageLog log
         -ConsoleView view
         -InputHandler input
         -SaveManager saveManager
         +start()
-        -showMainMenu()
-        -selectSlot()
-        -showSlotMenu()
-        -showAltar()
+        -showMainMenu() GameState
+        -showSlotMenu() GameState
+        -showAltar() GameState
+        -showRecords() GameState
         -newRun()
         -continueRun()
-        -gameLoop()
+        -playRun() GameState
         -descend()
-        -endRun(boolean victory, String cause)
-        -saveAndQuit()
+        -saveAndQuit() GameState
+        -endRun(boolean victory) GameState
     }
     class GameState {
         <<enumeration>>
         MAIN_MENU
         SLOT_MENU
         ALTAR
+        RECORDS
         PLAYING
         DEAD
         VICTORY
@@ -111,13 +108,27 @@ classDiagram
     }
     class TurnSystem {
         -CombatSystem combat
-        -MonsterAI ai
-        -MessageLog log
-        +executePlayer(Command cmd, Player p, Floor f) boolean
-        +runMonsters(Player p, Floor f)
-        -tryMove(Player p, Floor f, Direction d) boolean
-        -pickUp(Player p, Floor f) boolean
-        -endOfTurn(Player p)
+        -MonsterAI monsterAI
+        -String deathCause
+        +playTurn(Command cmd, GameContext ctx) TurnOutcome
+        +getDeathCause() String
+        -executePlayer(Command cmd, GameContext ctx) TurnOutcome
+        -tryMove(Direction d, GameContext ctx) TurnOutcome
+        -attack(Monster target, GameContext ctx) TurnOutcome
+        -pickUp(GameContext ctx) TurnOutcome
+        -useOrEquip(Command cmd, GameContext ctx) TurnOutcome
+        -drop(int index, GameContext ctx) TurnOutcome
+        -descend(GameContext ctx) TurnOutcome
+        -runMonsters(GameContext ctx) TurnOutcome
+        -endOfTurn(GameContext ctx)
+    }
+    class TurnOutcome {
+        <<enumeration>>
+        NO_TURN
+        TURN_USED
+        DESCENDED
+        VICTORY
+        DIED
     }
     class Command {
         <<record>>
@@ -151,11 +162,13 @@ classDiagram
         -MapRenderer mapRenderer
         -boolean ansiClear
         +clearScreen()
-        +render(Floor f, Player p, MessageLog log, int turn)
-        +printStatusBar(Player p)
+        +render(GameContext ctx)
+        +printStatusBar(Player p, int floorLevel, int turn)
         +printInventory(Inventory inv)
+        +printHelp()
         +printAltar(Profile profile)
-        +printRunResult(RunResult r, int shards)
+        +printRecords(Profile profile)
+        +printRunResult(RunResult r, List~String~ shardBreakdown)
         +printMenu(String title, List~String~ options)
         +printLine(String msg)
     }
@@ -179,16 +192,18 @@ classDiagram
     Main --> GameManager
     GameManager --> GameState
     GameManager --> TurnSystem
-    GameManager --> MessageLog
+    GameManager --> GameContext
+    TurnSystem ..> TurnOutcome
     GameManager --> ConsoleView
     GameManager --> InputHandler
     GameManager ..> CommandParser
     CommandParser ..> Command : creates
     Command --> CommandType
     ConsoleView --> MapRenderer
-    TurnSystem --> MessageLog
 ```
 
+> 턴 순서(플레이어 행동 → 몬스터 행동 → 턴 마무리)는 `TurnSystem.playTurn()` 한곳에서 정한다. `INVENTORY`, `HELP`, `SAVE_QUIT`은 턴을 쓰지 않는 화면 명령이라 `GameManager`가 처리한다. 사망 원인은 `playTurn()`이 `DIED`를 돌려준 직후 `getDeathCause()`로 읽는다.
+>
 > `MapRenderer.symbolAt()` 우선순위: 플레이어 `@` → 몬스터 기호 → 바닥 아이템 기호 → 타일 기호. P1 시야 적용 시 안 본 칸은 공백, 본 적 있지만 지금 안 보이는 칸은 타일만(몬스터 숨김).
 
 ---
@@ -207,10 +222,10 @@ classDiagram
     }
     class Entity {
         <<abstract>>
-        #String name
-        #char symbol
-        #Position pos
-        #Stats stats
+        -String name
+        -char symbol
+        -Position pos
+        -Stats stats
         +getName() String
         +getSymbol() char
         +getPos() Position
@@ -246,6 +261,10 @@ classDiagram
         +Player(String name, Job job)
         +getAttack() int
         +getDefense() int
+        +getBaseAttack() int
+        +getWeaponAttack() int
+        +getBaseDefense() int
+        +getArmorDefense() int
         +gainExp(int exp) boolean
         -levelUp()
         +equip(Item item) String
@@ -274,13 +293,18 @@ classDiagram
     }
     class Item {
         <<abstract>>
-        #String id
-        #String name
-        #char symbol
-        #ItemType type
+        -String id
+        -String name
+        -char symbol
+        -ItemType type
+        -String description
+        -int minFloor
+        -int maxFloor
         +getId() String
         +getDisplayName() String
         +getSymbol() char
+        +getDescription() String
+        +canDropOn(int floorLevel) boolean
         +use(ItemUser user)* String
     }
     class ItemType {
@@ -801,19 +825,11 @@ classDiagram
     }
     class SlotData {
         <<record>>
-        int version
-        LocalDateTime savedAt
         Profile profile
-        RunData run
+        Optional~GameContext~ run
+        +profileOnly(Profile p)$ SlotData
+        +withRun(Profile p, GameContext run)$ SlotData
         +hasRun() boolean
-    }
-    class RunData {
-        <<record>>
-        int turn
-        Player player
-        Floor floor
-        RunResult result
-        +capture(Player p, Floor f, int turn, RunResult r)$ RunData
     }
     class SaveFileParser {
         -Map sections
@@ -836,10 +852,7 @@ classDiagram
     SaveManager ..> SaveFileParser
     SaveManager ..> SaveLoadException : throws
     SlotData --> Profile
-    SlotData --> RunData
-    RunData --> Player
-    RunData --> Floor
-    RunData --> RunResult
+    SlotData --> GameContext
     SaveManager ..> ItemFactory : createById
     SaveManager ..> MonsterFactory : create
     SaveManager ..> Floor : fromSave
@@ -870,7 +883,7 @@ sequenceDiagram
     participant FS as saves/slot1.sav
 
     Note over GM,FS: 저장 후 종료
-    GM->>SM: save(1, SlotData(profile, RunData.capture(...)))
+    GM->>SM: save(1, SlotData.withRun(profile, run))
     SM->>FS: slot1.sav.tmp 쓰기 후 교체
 
     Note over GM,FS: 사망 또는 클리어
@@ -884,7 +897,7 @@ sequenceDiagram
 
     Note over GM,FS: 제단에서 강화 구매
     GM->>PR: buy(MAX_HP)
-    GM->>SM: save(1, SlotData(profile, null))
+    GM->>SM: save(1, SlotData.profileOnly(profile))
 ```
 
 ---
@@ -900,25 +913,28 @@ sequenceDiagram
     participant CS as CombatSystem
     participant AI as MonsterAI
 
-    GM->>V: render(floor, player, log, turn)
+    GM->>V: render(ctx)
     GM->>GM: input.readLine() → CommandParser.parse()
-    GM->>TS: executePlayer(cmd, player, floor)
+    GM->>TS: playTurn(cmd, ctx)
     alt 이동 방향에 몬스터 있음
         TS->>CS: attack(player, monster, log)
         CS-->>TS: AttackResult
         opt killed
             TS->>CS: rewardKill(monster, ctx)
+            CS->>F: removeMonster(monster)
+            opt 보스 처치
+                TS-->>GM: VICTORY
+            end
         end
     else 이동 가능
         TS->>F: isWalkable(next)
         TS->>TS: player.setPos(next)
     end
-    TS-->>GM: 턴 소모 여부
     opt 턴 소모
-        GM->>TS: runMonsters(player, floor)
         loop 층의 모든 몬스터
             TS->>AI: act(monster, ctx)
         end
-        GM->>GM: turn++, 사망 확인
+        TS->>TS: ctx.nextTurn(), player.regenerate(turn)
     end
+    TS-->>GM: TurnOutcome (NO_TURN / TURN_USED / DESCENDED / VICTORY / DIED)
 ```

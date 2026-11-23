@@ -17,13 +17,24 @@ public final class ShardCalculator {
     private ShardCalculator() {
     }
 
-    /** 받을 파편 합계. 파편 수집가(SHARD_BOOST, P1) 단계만큼 % 를 더한다. */
+    /**
+     * 받을 파편 합계. 파편 수집가(SHARD_BOOST, P1) 단계만큼 % 를 더한다.
+     */
     public static int calculate(RunResult r, Profile p) {
-        // TODO(B): 층×10 + 처치×1 + 레벨×3 + 골드÷10 + (클리어면 100), 그 뒤 SHARD_BOOST 배율
-        throw new UnsupportedOperationException("TODO(B): ShardCalculator.calculate");
+        int total = (r.getDeepestFloor() * SHARDS_PER_FLOOR);
+        total += (r.getKills() * SHARDS_PER_KILL);
+        total += (r.getFinalLevel() * SHARDS_PER_LEVEL);
+        total += (r.getGold() / GOLD_PER_SHARD);
+        if (r.isVictory() == true) {
+            total += CLEAR_BONUS;
+        }
+        int boostPercent = p.getLevel(UpgradeType.SHARD_BOOST) * UpgradeType.SHARD_BOOST.getValuePerLevel();
+        return total + total * boostPercent / 100;
     }
 
-    /** 결과 화면에 보여 줄 항목별 내역. 예: "도달 층 3 × 10 = 30" */
+    /**
+     * 결과 화면에 보여 줄 항목별 내역. 예: "도달 층 3 × 10 = 30"
+     */
     public static List<String> breakdown(RunResult r, Profile p) {
         // TODO(B): calculate 와 같은 항목을 문장으로
         throw new UnsupportedOperationException("TODO(B): ShardCalculator.breakdown");

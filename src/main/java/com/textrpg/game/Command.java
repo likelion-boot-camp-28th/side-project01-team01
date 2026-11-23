@@ -1,8 +1,8 @@
 package com.textrpg.game;
 
-import com.textrpg.core.Direction;
-
 import java.util.Objects;
+
+import com.textrpg.core.Direction;
 
 /**
  * 플레이어 명령 하나. CommandParser 가 만들고 GameManager / TurnSystem 이 실행한다.
