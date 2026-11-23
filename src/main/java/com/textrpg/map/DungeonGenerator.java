@@ -2,6 +2,7 @@ package com.textrpg.map;
 
 import com.textrpg.core.Direction;
 import com.textrpg.core.Position;
+import com.textrpg.item.FloorItem;
 import com.textrpg.monster.Boss;
 import com.textrpg.monster.Monster;
 import com.textrpg.monster.MonsterFactory;
@@ -273,7 +274,12 @@ public final class DungeonGenerator {
      * 시작 방을 뺀 방들에 골드 더미 MIN_GOLD_PILES ~ MAX_GOLD_PILES 개. 더미당 층 x GOLD_PER_FLOOR_MIN ~ MAX.
      */
     private static void placeGold(Floor f) {
-        // TODO(D): 골드 FloorItem 생성 → addItem (B 와 FloorItem 골드 표현 합의 필요)
-        throw new UnsupportedOperationException("DungeonGenerator.placeGold 는 아직 구현되지 않았습니다.");
+        int pileCount = RandomUtil.nextInt(MIN_GOLD_PILES, MAX_GOLD_PILES);
+        for (int i = 0; i < pileCount; i++) {
+            Position p = randomPositionOutsideStartRoom(f);
+            int amount = RandomUtil.nextInt(f.getLevel() * GOLD_PER_FLOOR_MIN, f.getLevel() * GOLD_PER_FLOOR_MAX);
+            FloorItem gold = FloorItem.gold(amount, p);
+            f.addItem(gold);
+        }
     }
 }
