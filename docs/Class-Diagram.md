@@ -207,10 +207,10 @@ classDiagram
     }
     class Entity {
         <<abstract>>
-        #String name
-        #char symbol
-        #Position pos
-        #Stats stats
+        -String name
+        -char symbol
+        -Position pos
+        -Stats stats
         +getName() String
         +getSymbol() char
         +getPos() Position
@@ -246,6 +246,10 @@ classDiagram
         +Player(String name, Job job)
         +getAttack() int
         +getDefense() int
+        +getBaseAttack() int
+        +getWeaponAttack() int
+        +getBaseDefense() int
+        +getArmorDefense() int
         +gainExp(int exp) boolean
         -levelUp()
         +equip(Item item) String
@@ -274,13 +278,18 @@ classDiagram
     }
     class Item {
         <<abstract>>
-        #String id
-        #String name
-        #char symbol
-        #ItemType type
+        -String id
+        -String name
+        -char symbol
+        -ItemType type
+        -String description
+        -int minFloor
+        -int maxFloor
         +getId() String
         +getDisplayName() String
         +getSymbol() char
+        +getDescription() String
+        +canDropOn(int floorLevel) boolean
         +use(ItemUser user)* String
     }
     class ItemType {
