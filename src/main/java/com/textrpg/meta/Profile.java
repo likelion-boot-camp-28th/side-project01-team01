@@ -7,6 +7,7 @@ import java.util.Set;
 
 import com.textrpg.entity.Job;
 import com.textrpg.entity.Player;
+import com.textrpg.entity.Stats;
 
 /**
  * 슬롯에 영구히 남는 기록: 파편, 강화 단계, 해금 직업, 누적 기록. 캐릭터가 죽어도 지워지지 않는다.
@@ -92,9 +93,19 @@ public class Profile {
      * 새 탐험 시작 직후 호출. 강화 단계만큼 Player 를 강하게 만든다.
      */
     public void applyTo(Player p) {
-        // TODO(B): MAX_HP·ATTACK·DEFENSE → 스탯 증가, START_POTION → 치유 물약 지급,
-        //  BAG_SIZE → 가방 칸 증가(P1), EXP_BOOST → p.setExpMultiplier(P1)
-        throw new UnsupportedOperationException("TODO(B): Profile.applyTo");
+        Stats stats = p.getStats();
+
+        int hpBonus = getLevel(UpgradeType.MAX_HP) * UpgradeType.MAX_HP.getValuePerLevel();
+        stats.addMaxHp(hpBonus);
+
+        int attackBonus = getLevel(UpgradeType.ATTACK) * UpgradeType.ATTACK.getValuePerLevel();
+        stats.setAttack(stats.getAttack() + attackBonus);
+
+        int defenseBonus = getLevel(UpgradeType.DEFENSE) * UpgradeType.DEFENSE.getValuePerLevel();
+        stats.setDefense(stats.getDefense() + defenseBonus);
+
+        // TODO(B): START_POTION → 치유 물약 지급 (가방 작업 때)
+        // TODO(B): BAG_SIZE → 가방 칸 증가(P1), EXP_BOOST → p.setExpMultiplier(P1)
     }
 
     /**

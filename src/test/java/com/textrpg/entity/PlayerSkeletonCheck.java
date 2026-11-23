@@ -37,6 +37,7 @@ public final class PlayerSkeletonCheck {
         checkShards();
         checkBreakdown();
         checkBuy();
+        checkApplyTo();
         checkFloorItem();
 
         System.out.println("통과 " + passed + " / 실패 " + failed);
@@ -255,6 +256,32 @@ public final class PlayerSkeletonCheck {
         check("마법사 해금됨, 파편 0", profile.isUnlocked(Job.MAGE) && profile.getShards() == 0);
         check("도적은 아직 잠김", !profile.isUnlocked(Job.ROGUE));
         check("해금은 1단계가 최대라 또 못 삼", !profile.buy(UpgradeType.UNLOCK_MAGE));
+    }
+
+    private static void checkApplyTo() {
+        Player plain = new Player("용사", Job.WARRIOR);
+        Profile empty = Profile.newProfile();
+        Player same = new Player("용사", Job.WARRIOR);
+        empty.applyTo(same);
+        check("강화 없으면 스탯 그대로",
+                same.getStats().getMaxHp() == plain.getStats().getMaxHp()
+                        && same.getStats().getAttack() == plain.getStats().getAttack()
+                        && same.getStats().getDefense() == plain.getStats().getDefense());
+
+        Profile profile = Profile.newProfile();
+        profile.recordRun(new RunResult(), 120);
+        profile.buy(UpgradeType.MAX_HP);
+        profile.buy(UpgradeType.MAX_HP);
+        profile.buy(UpgradeType.ATTACK);
+        profile.buy(UpgradeType.DEFENSE);
+        check("구매: HP 2단계, 공격 1, 방어 1 (20+40+30+30 = 120)", profile.getShards() == 0);
+
+        Player p = new Player("용사", Job.WARRIOR);
+        profile.applyTo(p);
+        check("최대 HP +10 (30 -> 40)", p.getStats().getMaxHp() == 40);
+        check("현재 HP 도 40 으로 꽉 참", p.getStats().getHp() == 40);
+        check("공격 +1", p.getStats().getAttack() == plain.getStats().getAttack() + 1);
+        check("방어 +1", p.getStats().getDefense() == plain.getStats().getDefense() + 1);
     }
 
     private static void checkFloorItem() {
