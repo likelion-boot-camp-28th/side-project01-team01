@@ -1,6 +1,7 @@
 package com.textrpg.combat;
 
 import java.util.List;
+
 import com.textrpg.context.GameContext;
 import com.textrpg.core.Direction;
 import com.textrpg.core.MessageLog;
@@ -11,7 +12,6 @@ import com.textrpg.monster.Boss;
 import com.textrpg.monster.Monster;
 import com.textrpg.monster.MonsterType;
 import com.textrpg.util.RandomUtil;
-
 
 /**
  * 몬스터 한 마리의 턴 행동(대기, 추적, 공격)을 결정한다.
@@ -36,10 +36,8 @@ public class MonsterAI {
         if (!monster.isAwake() && canSee(monster, player, floor)) {
             monster.wakeUp();
         }
-
         if (player.isAlive() && monster.isAwake()) {
             int actionCount = monster.getType().getSpeed();
-
             if (monster instanceof Boss) {
                 actionCount = ((Boss) monster).attacksPerTurn();
             }
@@ -47,7 +45,6 @@ public class MonsterAI {
             for (int i = 0; i < actionCount; i++) {
                 moveOrAttack(monster, player, floor, log);
             }
-
             if (ctx.getTurn() % ZERO_SPEED_ACTION_INTERVAL == 0 && monster.getType().getSpeed() == 0) {
                 moveOrAttack(monster, player, floor, log);
             }
