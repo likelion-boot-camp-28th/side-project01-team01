@@ -1,6 +1,7 @@
 package com.textrpg.map;
 
 import com.textrpg.core.Position;
+import com.textrpg.monster.Boss;
 import com.textrpg.monster.Monster;
 import com.textrpg.monster.MonsterFactory;
 import com.textrpg.monster.MonsterType;
@@ -201,8 +202,17 @@ public final class DungeonGenerator {
      * 첫 방에 시작 위치, 마지막 방에 계단. 5층은 계단 대신 MonsterFactory.createBoss 로 보스.
      */
     private static void placeStartAndGoal(Floor f) {
-        // TODO(D): setStartPos(첫 방 randomInside) → level < MAX_FLOOR 면 STAIRS_DOWN + setStairs, 아니면 보스
-        throw new UnsupportedOperationException("DungeonGenerator.placeStartAndGoal 은 아직 구현되지 않았습니다.");
+        List<Room> rooms = f.getRooms();
+        f.setStartPos(rooms.get(0).randomInside());
+
+        Position p = rooms.get(rooms.size() - 1).randomInside();
+        if (f.getLevel() < MAX_FLOOR) {
+            f.setTile(p.x(), p.y(), Tile.STAIRS_DOWN);
+            f.setStairs(p);
+        } else {
+            Boss boss = MonsterFactory.createBoss(p);
+            f.addMonster(boss);
+        }
     }
 
     /**
