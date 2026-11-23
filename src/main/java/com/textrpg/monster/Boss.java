@@ -2,13 +2,31 @@ package com.textrpg.monster;
 
 import com.textrpg.core.Position;
 
-public class Boss extends Monster{
-    public Boss(Position pos) {
+/**
+ * 5층 보스 어둠의 파수꾼(ABYSS_WARDEN).
+ * HP가 절반 이하로 떨어지면 분노 상태가 되어 한 턴에 두 번 공격한다.
+ * MonsterFactory.create(ABYSS_WARDEN, ...) 또는 createBoss()로 생성한다.
+ */
+public class Boss extends Monster {
+
+    private static final int ENRAGE_HP_DIVISOR = 2;
+    private static final int ENRAGED_ATTACK = 2;
+    private static final int NORMAL_ATTACK = 1;
+
+    Boss(Position pos) {
         super(MonsterType.ABYSS_WARDEN, pos);
     }
 
-    public int attacksPerTurn(){
-        if(this.getStats().getHp() <= this.getStats().getMaxHp() / 2) return 2;
-        else return 1;
+    /**
+     * 이번 턴에 공격할 횟수. HP가 최대 HP의 절반 이하면 2회, 아니면 1회다.
+     *
+     * @return 이번 턴 공격 횟수
+     */
+    public int attacksPerTurn() {
+        if (this.getStats().getHp() <= this.getStats().getMaxHp() / ENRAGE_HP_DIVISOR) {
+            return ENRAGED_ATTACK;
+        } else {
+            return NORMAL_ATTACK;
+        }
     }
 }
