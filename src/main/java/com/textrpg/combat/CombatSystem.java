@@ -26,13 +26,14 @@ public class CombatSystem {
         boolean critical = false;
         int damage = 0;
         if (hit) {
-            log.add(attacker.getName() + "의 공격이 " + defender.getName() + "에게 명중했습니다.");
+            String resultText = "명중했습니다.";
             damage = DamageCalculator.calculate(attacker, defender);
             critical = DamageCalculator.rollCritical(attacker);
             if (critical) {
-                log.add("치명타 발생!!");
+                resultText = "치명타로 " + resultText;
                 damage = DamageCalculator.applyCritical(damage);
             }
+            log.add(attacker.getName() + "의 공격이 " + defender.getName() + "에게 " + resultText);
             damage = defender.takeDamage(damage);
             log.add(defender.getName() + "의 체력이 " + damage + "만큼 감소했습니다.");
         } else {
