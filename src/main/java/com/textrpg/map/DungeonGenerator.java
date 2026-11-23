@@ -1,6 +1,10 @@
 package com.textrpg.map;
 
 import com.textrpg.core.Position;
+import com.textrpg.monster.Monster;
+import com.textrpg.monster.MonsterFactory;
+import com.textrpg.monster.MonsterType;
+import com.textrpg.util.RandomUtil;
 
 import java.util.Optional;
 
@@ -56,7 +60,23 @@ public final class DungeonGenerator {
      */
     public static Floor createTestFloor() {
         // TODO(D): 방 2개 + 복도 1개를 고정 좌표로 그리고 시작 위치·계단·몬스터 1마리 배치
-        throw new UnsupportedOperationException("DungeonGenerator.createTestFloor 는 아직 구현되지 않았습니다.");
+
+        Floor floor = new Floor(1);
+        Room room1 = new Room(3, 3, 8, 5);
+        Room room2 = new Room(25, 4, 10, 6);
+        floor.addRoom(room1);
+        floor.addRoom(room2);
+        carveRoom(floor, room1);
+        carveRoom(floor, room2);
+        carveCorridor(floor, new Position(7, 5), new Position(30, 5));
+        floor.setStartPos(new Position(4, 4));
+
+        Position stairs = new Position(30, 9);
+        floor.setTile(stairs.x(), stairs.y(), Tile.STAIRS_DOWN);
+        floor.setStairs(stairs);
+        Monster m = MonsterFactory.create(MonsterType.SLIME, new Position(27, 6));
+        floor.addMonster(m);
+        return floor;
     }
 
     /**
@@ -120,7 +140,27 @@ public final class DungeonGenerator {
      */
     private static void carveCorridor(Floor f, Position a, Position b) {
         // TODO(D): RandomUtil.chance(50) 로 순서 결정 → 가로 구간, 세로 구간을 carveTile
-        throw new UnsupportedOperationException("DungeonGenerator.carveCorridor 는 아직 구현되지 않았습니다.");
+        if (RandomUtil.chance(50)) {
+            carveHorizontal(f, a.x(), b.x(), a.y());
+            carveVertical(f, a.y(), b.y(), b.x());
+        } else {
+            carveVertical(f, a.y(), b.y(), a.x());
+            carveHorizontal(f, a.x(), b.x(), b.y());
+        }
+
+    }
+
+    private static void carveHorizontal(Floor f, int x1, int x2, int y) {
+
+        for (int x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) {
+            carveTile(f, x, y);
+        }
+    }
+
+    private static void carveVertical(Floor f, int y1, int y2, int x) {
+        for (int y = Math.min(y1, y2); y <= Math.max(y1, y2); y++) {
+            carveTile(f, x, y);
+        }
     }
 
     /**
