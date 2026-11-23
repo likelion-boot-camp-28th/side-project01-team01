@@ -62,8 +62,13 @@ public class CombatSystem {
         }
         int exp = monster.getExpReward();
         int gold = monster.getGoldReward();
+        int preLevel = ctx.getPlayer().getLevel();
         ctx.getPlayer().gainExp(exp);
         ctx.getPlayer().addGold(gold);
+        int postLevel = ctx.getPlayer().getLevel();
+        if (preLevel != postLevel) {
+            ctx.getLog().add("레벨업했습니다. +" + (postLevel - preLevel));
+        }
 
         ctx.getFloor().removeMonster(monster);
         if (monster.getType() == MonsterType.SKELETON) {
