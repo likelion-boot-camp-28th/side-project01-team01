@@ -1,5 +1,6 @@
 package com.textrpg.map;
 
+import com.textrpg.core.Direction;
 import com.textrpg.core.Position;
 import com.textrpg.monster.Boss;
 import com.textrpg.monster.Monster;
@@ -7,6 +8,7 @@ import com.textrpg.monster.MonsterFactory;
 import com.textrpg.monster.MonsterType;
 import com.textrpg.util.RandomUtil;
 
+import java.util.ArrayDeque;
 import java.util.List;
 import java.util.Optional;
 
@@ -89,8 +91,25 @@ public final class DungeonGenerator {
      * @return 갈 수 있으면 true
      */
     static boolean isReachable(Floor f, Position a, Position b) {
-        // TODO(D): BFS, 이웃은 Direction.values() 로 상하좌우, f.isWalkable 로 통행 판정
-        throw new UnsupportedOperationException("DungeonGenerator.isReachable 은 아직 구현되지 않았습니다.");
+        ArrayDeque<Position> queue = new ArrayDeque<>();
+        boolean[][] visited = new boolean[Floor.HEIGHT][Floor.WIDTH];
+
+        queue.add(a);
+        visited[a.y()][a.x()] = true;
+        while (!queue.isEmpty()) {
+            Position p = queue.poll();
+            if (p.equals(b)) {
+                return true;
+            }
+            for (Direction d : Direction.values()) {
+                Position neighbor = p.move(d);
+                if (f.isWalkable(neighbor) && !visited[neighbor.y()][neighbor.x()]) {
+                    queue.add(neighbor);
+                    visited[neighbor.y()][neighbor.x()] = true;
+                }
+            }
+        }
+        return false;
     }
 
     /**
