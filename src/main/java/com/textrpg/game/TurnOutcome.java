@@ -12,5 +12,7 @@ public enum TurnOutcome {
     /** 계단을 내려감. GameManager 가 다음 층을 만든다. */
     DESCENDED,
     /** 보스를 처치함. GameManager 가 클리어 처리를 한다. */
-    VICTORY
+    VICTORY,
+    /** 몬스터 행동 중 플레이어가 쓰러짐. 원인은 TurnSystem.getDeathCause(). GameManager 가 사망 처리를 한다. */
+    DIED
 }
