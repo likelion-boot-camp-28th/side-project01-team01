@@ -59,8 +59,6 @@ public final class DungeonGenerator {
      * @return 테스트용 층 (부를 때마다 새 객체)
      */
     public static Floor createTestFloor() {
-        // TODO(D): 방 2개 + 복도 1개를 고정 좌표로 그리고 시작 위치·계단·몬스터 1마리 배치
-
         Floor floor = new Floor(1);
         Room room1 = new Room(3, 3, 8, 5);
         Room room2 = new Room(25, 4, 10, 6);
@@ -107,8 +105,28 @@ public final class DungeonGenerator {
      * ROOM_PLACE_TRIES 번 시도해 겹치지 않는 방을 MAX_ROOMS 개까지 추가하고 carveRoom 으로 그린다.
      */
     private static void placeRooms(Floor f) {
-        // TODO(D): 크기·위치 무작위 → 벽까지 맵 안인지, 기존 방과 intersects 인지 확인 → addRoom, carveRoom
-        throw new UnsupportedOperationException("DungeonGenerator.placeRooms 는 아직 구현되지 않았습니다.");
+        for (int i = 0; i < ROOM_PLACE_TRIES; i++) {
+            if (f.getRooms().size() >= MAX_ROOMS) {
+                break;
+            }
+            int w = RandomUtil.nextInt(ROOM_MIN_W, ROOM_MAX_W);
+            int h = RandomUtil.nextInt(ROOM_MIN_H, ROOM_MAX_H);
+            int x = RandomUtil.nextInt(1, Floor.WIDTH - w - 1);
+            int y = RandomUtil.nextInt(1, Floor.HEIGHT - h - 1);
+            Room room = new Room(x, y, w, h);
+            boolean isOverlapping = false;
+            for (Room r : f.getRooms()) {
+                if (r.intersects(room)) {
+                    isOverlapping = true;
+                    break;
+                }
+            }
+            if (isOverlapping) {
+                continue;
+            }
+            f.addRoom(room);
+            carveRoom(f, room);
+        }
     }
 
     /**
@@ -139,7 +157,6 @@ public final class DungeonGenerator {
      * a 에서 b 까지 L자 복도를 판다. 가로·세로 중 무엇을 먼저 팔지는 무작위.
      */
     private static void carveCorridor(Floor f, Position a, Position b) {
-        // TODO(D): RandomUtil.chance(50) 로 순서 결정 → 가로 구간, 세로 구간을 carveTile
         if (RandomUtil.chance(50)) {
             carveHorizontal(f, a.x(), b.x(), a.y());
             carveVertical(f, a.y(), b.y(), b.x());
