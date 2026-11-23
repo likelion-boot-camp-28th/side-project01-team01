@@ -343,6 +343,18 @@ public final class PlayerSkeletonCheck {
         String message = p.useItem(0);
         check("가방 0번 물약 사용 -> HP 15 -> 25", p.getStats().getHp() == 25);
         check("물약의 결과 문장을 그대로 돌려줌", message.contains("HP 를 10"));
+        check("마신 물약은 가방에서 사라짐", p.getInventory().size() == 0);
+
+        Item sword = ItemFactory.createById("IRON_SWORD");
+        Item potion1 = ItemFactory.createById("HP_POTION_S");
+        Item potion2 = ItemFactory.createById("HP_POTION_S");
+        p.getInventory().add(sword);
+        p.getInventory().add(potion1);
+        p.getInventory().add(potion2);
+        p.useItem(2);
+        check("같은 물약 2개 중 마신 것(2번)만 빠짐",
+                p.getInventory().size() == 2 && p.getInventory().get(1) == potion1);
+        check("다른 아이템(철 검)은 그대로", p.getInventory().get(0) == sword);
     }
 
 

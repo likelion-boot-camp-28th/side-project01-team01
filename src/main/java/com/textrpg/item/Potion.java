@@ -27,7 +27,12 @@ public class Potion extends Item {
     public String use(ItemUser user) {
         int healed = user.heal(hpRestore);
         int restored = user.restoreMp(mpRestore);
-        // TODO(B): 가방 작업 때 가방에서 제거
+
+        int index = user.getInventory().getItems().indexOf(this);
+        if (index >= 0) {
+            user.getInventory().remove(index);
+        }
+
         return "HP 를 " + healed + " 회복했다. MP 를 " + restored + " 회복했다.";
     }
 }
