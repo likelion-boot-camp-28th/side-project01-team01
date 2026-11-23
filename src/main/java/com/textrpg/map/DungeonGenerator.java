@@ -6,8 +6,8 @@ import com.textrpg.monster.MonsterFactory;
 import com.textrpg.monster.MonsterType;
 import com.textrpg.util.RandomUtil;
 
+import java.util.List;
 import java.util.Optional;
-
 
 /**
  * 층을 무작위로 생성한다. 생성 절차와 상수 값은 docs/Class-Diagram.md 5.3 참고.
@@ -149,8 +149,11 @@ public final class DungeonGenerator {
      * 방을 x 좌표순으로 정렬한 뒤 i 번 방과 i+1 번 방의 중심을 L자 복도로 잇는다.
      */
     private static void connectRooms(Floor f) {
-        // TODO(D): sortRoomsByX → 이웃한 방끼리 carveCorridor(center, center)
-        throw new UnsupportedOperationException("DungeonGenerator.connectRooms 는 아직 구현되지 않았습니다.");
+        f.sortRoomsByX();
+        List<Room> rooms = f.getRooms();
+        for (int i = 0; i < rooms.size() - 1; i++) {
+            carveCorridor(f, rooms.get(i).center(), rooms.get(i + 1).center());
+        }
     }
 
     /**
