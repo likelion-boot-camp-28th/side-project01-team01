@@ -37,7 +37,7 @@ classDiagram
 |---|---|---|
 | A | 게임 루프·UI·세이브 | Main, GameManager, GameState, TurnSystem, Command, CommandParser, ConsoleView, MapRenderer, InputHandler, RandomUtil, SaveManager, SlotData, SaveFileParser, SaveFileWriter, SaveLoadException, TurnOutcome, RankingManager(P1) |
 | B | 캐릭터·아이템·영구 성장 | Entity, Player, Job, Stats, Item, Weapon, Armor, Potion, Scroll(P1), Food(P1), ItemType, ItemUser, Inventory, FloorItem, ItemFactory, ItemIdentifier(P1), Profile, UpgradeType, RunResult, ShardCalculator |
-| C | 몬스터·전투 | Monster, Boss, MonsterType, MonsterFactory, MonsterAI, CombatSystem, DamageCalculator, AttackResult |
+| C | 몬스터·전투 | Monster, Boss, PileOfBones, MonsterType, MonsterFactory, MonsterAI, CombatSystem, DamageCalculator, AttackResult |
 | D | 맵·생성 | Floor, Tile, Room, DungeonGenerator, FieldOfView(P1), DungeonGeneratorCheck(검증용, `src/test/java`) |
 | 공통 | `core` 패키지 (수정 전 팀 공유) | Position, Direction, MessageLog |
 | 공통 | `context` 패키지 (수정 전 팀 공유) | GameContext |
@@ -412,8 +412,21 @@ classDiagram
         +wakeUp()
     }
     class Boss {
+        -ENRAGE_HP_DIVISOR$ int
+        -ENRAGED_ATTACK$ int
+        -NORMAL_ATTACK$ int
+        -ENRAGED_HEAL$ int
         ~Boss(Position pos)
         +attacksPerTurn() int
+        +restore()
+        -isEnraged() boolean
+    }
+    class PileOfBones {
+        -REVIVE_DURATION$ int
+        -int birth
+        ~PileOfBones(Position pos, int birth)
+        +isTimeToRevive(int turn) boolean
+        +getBirth() int
     }
     class MonsterType {
         <<enumeration>>
@@ -422,6 +435,7 @@ classDiagram
         GOBLIN
         WOLF
         SKELETON
+        PILE_OF_BONES
         ORC
         SPIDER
         SHADOW_KNIGHT
@@ -442,10 +456,15 @@ classDiagram
     }
     class MonsterFactory {
         +create(MonsterType t, Position pos)$ Monster
+        +create(MonsterType t, Position pos, int birth)$ Monster
         +createRandom(int floorLevel, Position pos)$ Monster
         +createBoss(Position pos)$ Boss
+        +createBones(Position pos, int birth)$ PileOfBones
     }
     class MonsterAI {
+        -SIGHT_RANGE$ int
+        -ZERO_SPEED_ACTION_INTERVAL$ int
+        -SHADOW_KNIGHT_RESTORATION$ int
         -CombatSystem combat
         +act(Monster m, GameContext ctx)
         -canSee(Monster m, Player p, Floor f) boolean
@@ -472,9 +491,12 @@ classDiagram
 
     Entity <|-- Monster
     Monster <|-- Boss
+    Monster <|-- PileOfBones
     Monster --> MonsterType
     MonsterFactory ..> Monster : creates
     MonsterAI --> CombatSystem
+    MonsterAI ..> MonsterFactory : create(SKELETON) 부활
+    CombatSystem ..> MonsterFactory : createBones
     CombatSystem ..> DamageCalculator
     CombatSystem ..> AttackResult : returns
 ```
@@ -483,12 +505,18 @@ classDiagram
 >   명중 = 70 + 15×speed, 치명타 = 5×speed, 회피 = 5×speed (단위 %, 몬스터 MP는 0)
 > 명중 판정: `chance(공격자 명중) && !chance(방어자 회피)`. 실제 명중 확률 = 명중 × (1 − 회피).
 > 데미지: 명중 실패 시 0 → `calculate()`가 `max(1, round((공격 - 방어) × 0.9~1.1))` → 치명타 시 `applyCritical()`이 `round(데미지 × 1.5)`.
-> 생성: `Monster`·`Boss` 생성자는 package-private이라 `MonsterFactory`로만 만들 수 있다 (Team_Rules 1.2).
->   `create(MonsterType, pos)`에 ABYSS_WARDEN을 넘기면 `Boss`를 돌려준다.
->   `createRandom(floorLevel, pos)`는 보스를 뺀 8종 중 minFloor ≤ floorLevel ≤ maxFloor인 종류를 무작위로 고른다.
+> 생성: `Monster`·`Boss`·`PileOfBones` 생성자는 package-private이라 `MonsterFactory`로만 만들 수 있다 (Team_Rules 1.2).
+>   `create(MonsterType, pos)`에 ABYSS_WARDEN을 넘기면 `Boss`를 돌려준다. PILE_OF_BONES를 넘기면 `IllegalArgumentException`을 던진다 (부활 턴 계산에 탄생 턴이 필요하기 때문). 뼈 무더기는 `create(PILE_OF_BONES, pos, birth)` 또는 `createBones(pos, birth)`로 만들고, `create(type, pos, birth)`에 다른 타입을 넘기면 `IllegalArgumentException`을 던진다.
+>   `createRandom(floorLevel, pos)`는 보스를 뺀 일반 몬스터 중 minFloor ≤ floorLevel ≤ maxFloor인 종류를 무작위로 고른다.
 >   floorLevel이 1~5 밖이면 `IllegalArgumentException`을 던진다.
 > AI 규칙: 깨어 있지 않으면 대기, 플레이어가 같은 방 또는 6칸 이내면 깨어남. 깨어 있으면 인접 시 공격, 아니면 x·y 중 거리가 큰 축으로 한 칸 이동(막히면 다른 축). `speed`가 2면 2번 행동, 슬라임처럼 느린 몬스터는 짝수 턴에만 행동.
-> `speed`: 0 = 짝수 턴에만 행동, 1 = 매 턴 1번, 2 = 매 턴 2번.
+> `speed`: 0 = 짝수 턴에만 행동, 1 = 매 턴 1번, 2 = 매 턴 2번, -1 = 행동하지 않음(뼈 무더기).
+>
+> 몬스터 특수 능력:
+> - **해골 병사 → 뼈 무더기**: `CombatSystem.rewardKill()`에서 SKELETON이 처치되면 같은 자리에 `MonsterFactory.createBones(pos, ctx.getTurn())`으로 뼈 무더기(`P`)를 놓는다. 해골 병사 자체는 경험치·골드가 0이고 처치 수(파편)에도 세지 않는다. 보상(14/14)과 처치 수 1은 뼈 무더기를 부숴야 받는다. 뼈 무더기는 생성 즉시 깨어 있고, 공격·이동하지 않으며(speed -1), `PileOfBones.isTimeToRevive(turn)`이 `turn >= birth + REVIVE_DURATION(4)`이 되면 `MonsterAI.act()`가 뼈 무더기를 빼고 그 자리에 `MonsterFactory.create(SKELETON, pos)`로 HP가 가득 찬 해골 병사를 놓는다.
+> - **오크**: 체력이 비정상적으로 높다 (`MonsterType` HP 40).
+> - **그림자 기사 재생**: 깨어 있는 동안 행동 전 매 턴 HP +`MonsterAI.SHADOW_KNIGHT_RESTORATION`(4).
+> - **어둠의 파수꾼**: 기본 speed 2로 매 턴 2회 행동. HP가 최대 HP의 절반 이하이면 `restore()`가 매 턴 HP +`ENRAGED_HEAL`(5) 재생하고, `attacksPerTurn()`은 3회 행동을 돌려준다.
 
 ---
 
@@ -868,7 +896,7 @@ classDiagram
 **이어하기**
 1. 슬롯 요약 출력 (예: `1) 파편 85 | 최고 3층 | 탐험 6회 | 진행 중: 용사 Lv.3 전사 지하 2층`, 빈 슬롯은 `(새 슬롯)`)
 2. `Files.readAllLines()` → `SaveFileParser.parse()` → `SlotData`
-3. `hasRun()`이면 `Floor.fromSave()`로 맵 복원 → `MonsterFactory.create(type, pos)` 후 HP 덮어쓰기 → `ItemFactory.createById()`로 바닥·가방·장비 복원
+3. `hasRun()`이면 `Floor.fromSave()`로 맵 복원 → `MonsterFactory.create(type, pos)` 후 HP 덮어쓰기 (PILE_OF_BONES는 탄생 턴을 함께 저장해 `MonsterFactory.create(type, pos, birth)`로 복원한다 — 세이브 형식은 A와 합의 필요) → `ItemFactory.createById()`로 바닥·가방·장비 복원
 4. 실패 시 `SaveLoadException` → 안내 후 메인 메뉴 (탐험 섹션만 손상이면 프로필만 살릴지 확인)
 
 **영구 죽음 + 영구 성장**

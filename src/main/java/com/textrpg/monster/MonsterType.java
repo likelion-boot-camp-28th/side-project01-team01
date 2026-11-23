@@ -12,11 +12,13 @@ public enum MonsterType {
     BAT("박쥐", 'B', 1, 2, 6, 3, 1, 3, 3, 1),
     GOBLIN("고블린", 'G', 1, 3, 12, 5, 1, 6, 25, 1),
     WOLF("늑대", 'W', 2, 3, 14, 6, 2, 8, 8, 2),
-    SKELETON("해골 병사", 'K', 3, 4, 20, 8, 3, 14, 14, 1),
-    ORC("오크", 'O', 3, 5, 26, 9, 4, 18, 18, 1),
+    SKELETON("해골 병사", 'K', 3, 4, 20, 8, 3, 0, 0, 1),
+    // -1이라는 speed 값은 행동 안함을 의미
+    PILE_OF_BONES("뼈 무더기", 'P', 0, 0, 10, 0, 3, 14, 14, -1),
+    ORC("오크", 'O', 3, 5, 40, 9, 4, 18, 18, 1),
     SPIDER("독거미", 'V', 4, 5, 18, 8, 2, 16, 16, 1),
     SHADOW_KNIGHT("그림자 기사", 'D', 4, 5, 32, 11, 6, 25, 25, 1),
-    ABYSS_WARDEN("어둠의 파수꾼", '&', 5, 5, 120, 14, 7, 0, 0, 1);
+    ABYSS_WARDEN("어둠의 파수꾼", '&', 5, 5, 120, 14, 7, 0, 0, 2);
 
     private static final int BASE_HIT_RATE = 70;
     private static final int HIT_RATE_PER_SPEED = 15;
