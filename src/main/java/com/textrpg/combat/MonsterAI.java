@@ -1,6 +1,7 @@
 package com.textrpg.combat;
 
 import java.util.List;
+
 import com.textrpg.context.GameContext;
 import com.textrpg.core.Direction;
 import com.textrpg.core.MessageLog;
@@ -9,9 +10,10 @@ import com.textrpg.entity.Player;
 import com.textrpg.map.Floor;
 import com.textrpg.monster.Boss;
 import com.textrpg.monster.Monster;
+import com.textrpg.monster.MonsterFactory;
 import com.textrpg.monster.MonsterType;
+import com.textrpg.monster.PileOfBones;
 import com.textrpg.util.RandomUtil;
-
 
 /**
  * 몬스터 한 마리의 턴 행동(대기, 추적, 공격)을 결정한다.
@@ -19,6 +21,7 @@ import com.textrpg.util.RandomUtil;
  */
 public class MonsterAI {
 
+    private static final int SHADOW_KNIGHT_RESTORATION = 4;
     private static final int SIGHT_RANGE = 6;
     private static final int ZERO_SPEED_ACTION_INTERVAL = 2;
     private final CombatSystem combat = new CombatSystem();
@@ -36,20 +39,25 @@ public class MonsterAI {
         if (!monster.isAwake() && canSee(monster, player, floor)) {
             monster.wakeUp();
         }
-
         if (player.isAlive() && monster.isAwake()) {
             int actionCount = monster.getType().getSpeed();
-
             if (monster instanceof Boss) {
                 actionCount = ((Boss) monster).attacksPerTurn();
+                ((Boss) monster).restore();
+            }
+
+            if (monster.getType() == MonsterType.SHADOW_KNIGHT) {
+                monster.heal(SHADOW_KNIGHT_RESTORATION);
             }
 
             for (int i = 0; i < actionCount; i++) {
                 moveOrAttack(monster, player, floor, log);
             }
-
             if (ctx.getTurn() % ZERO_SPEED_ACTION_INTERVAL == 0 && monster.getType().getSpeed() == 0) {
                 moveOrAttack(monster, player, floor, log);
+            }
+            if (monster instanceof PileOfBones bones) {
+                revive(bones, ctx);
             }
         }
     }
@@ -133,6 +141,14 @@ public class MonsterAI {
         Position newPos = monster.getPos().move(direction);
         if (floor.isWalkable(newPos) && floor.getMonsterAt(newPos) == null) {
             monster.setPos(newPos);
+        }
+    }
+
+    private void revive(PileOfBones bones, GameContext ctx) {
+        if (bones.isTimeToRevive(ctx.getTurn())) {
+            ctx.getFloor().removeMonster(bones);
+            ctx.getFloor().addMonster(MonsterFactory.create(MonsterType.SKELETON, bones.getPos()));
+            ctx.getLog().add("뼈 무더기가 해골 병사로 부활했습니다.");
         }
     }
 }

@@ -4,6 +4,8 @@ import com.textrpg.context.GameContext;
 import com.textrpg.core.MessageLog;
 import com.textrpg.entity.Entity;
 import com.textrpg.monster.Monster;
+import com.textrpg.monster.MonsterFactory;
+import com.textrpg.monster.MonsterType;
 
 /**
  * 플레이어와 몬스터가 부딪혔을 때의 공격 한 번과 처치 보상을 처리한다.
@@ -26,13 +28,14 @@ public class CombatSystem {
         boolean critical = false;
         int damage = 0;
         if (hit) {
-            log.add(attacker.getName() + "의 공격이 " + defender.getName() + "에게 명중했습니다.");
+            String resultText = "명중했습니다.";
             damage = DamageCalculator.calculate(attacker, defender);
             critical = DamageCalculator.rollCritical(attacker);
             if (critical) {
-                log.add("치명타 발생!!");
+                resultText = "치명타로 " + resultText;
                 damage = DamageCalculator.applyCritical(damage);
             }
+            log.add(attacker.getName() + "의 공격이 " + defender.getName() + "에게 " + resultText);
             damage = defender.takeDamage(damage);
             log.add(defender.getName() + "의 체력이 " + damage + "만큼 감소했습니다.");
         } else {
@@ -46,22 +49,28 @@ public class CombatSystem {
     }
 
     /**
-     * 처치한 몬스터의 경험치·골드를 플레이어에게 주고,
-     * ctx.getRunResult().addKill()로 처치 수를 기록한다.
+     * 처치한 몬스터의 경험치·골드를 플레이어에게 주고, 몬스터를 맵에서 제거한다.
+     * 단, 처치된 몬스터가 해골 병사(SKELETON)인 경우 해골 병사가 제거된 자리에 뼈 무더기(PILE_OF_BONES)가 생성된다.
+     * ctx.getRunResult().addKill()로 처치 수를 기록한다. (해골 병사는 제외)
      *
      * @param monster 처치한 몬스터
      * @param ctx     플레이어와 런 기록을 담은 게임 상태
      */
     public void rewardKill(Monster monster, GameContext ctx) {
-        ctx.getRunResult().addKill();
-
+        if (monster.getType() != MonsterType.SKELETON) {
+            ctx.getRunResult().addKill();
+        }
         int exp = monster.getExpReward();
         int gold = monster.getGoldReward();
         ctx.getPlayer().gainExp(exp);
         ctx.getPlayer().addGold(gold);
-        ctx.getLog().add("처치 보상이 정산됩니다. +" + exp + "exp +" + gold + "gold");
 
         ctx.getFloor().removeMonster(monster);
-        ctx.getLog().add("처치된 몬스터가 맵에서 제거됩니다.");
+        if (monster.getType() == MonsterType.SKELETON) {
+            ctx.getFloor().addMonster(MonsterFactory.createBones(monster.getPos(), ctx.getTurn()));
+            ctx.getLog().add("해골 병사가 사망하여 뼈 무더기가 되었습니다. 얼마 후에 해골 병사로 부활합니다. 그전에 처치하세요.");
+        } else {
+            ctx.getLog().add("처치 보상이 정산됩니다. +" + exp + "exp +" + gold + "gold");
+        }
     }
 }
