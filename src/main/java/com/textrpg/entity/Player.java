@@ -191,8 +191,7 @@ public class Player extends Entity implements ItemUser {
      * Player 가 Floor 를 알면 entity → map → monster → entity 로 패키지가 서로를 참조하게 되기 때문이다.
      */
     public Item dropItem(int index) {
-        // TODO(B): inventory.remove(index)
-        throw new UnsupportedOperationException("TODO(B): Player.dropItem");
+        return inventory.remove(index);
     }
 
     /**

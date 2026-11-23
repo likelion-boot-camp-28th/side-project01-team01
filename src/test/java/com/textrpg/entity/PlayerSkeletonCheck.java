@@ -40,6 +40,7 @@ public final class PlayerSkeletonCheck {
         checkApplyTo();
         checkFloorItem();
         checkCreateRandom();
+        checkDropItem();
 
         System.out.println("통과 " + passed + " / 실패 " + failed);
         if (failed > 0) {
@@ -317,6 +318,20 @@ public final class PlayerSkeletonCheck {
         Item a = ItemFactory.createRandom(1);
         Item b = ItemFactory.createRandom(1);
         check("부를 때마다 새 아이템 객체", a != b);
+    }
+
+
+    private static void checkDropItem() {
+        Player p = new Player("용사", Job.WARRIOR);
+        Item sword = ItemFactory.createById("IRON_SWORD");
+        Item potion = ItemFactory.createById("HP_POTION_S");
+        p.getInventory().add(sword);
+        p.getInventory().add(potion);
+
+        Item dropped = p.dropItem(0);
+        check("버린 아이템을 돌려줌 (0번 = 철 검)", dropped == sword);
+        check("가방에서 빠짐 (2개 -> 1개)", p.getInventory().size() == 1);
+        check("남은 아이템이 0번으로 당겨짐", p.getInventory().get(0) == potion);
     }
 
 
