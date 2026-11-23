@@ -165,8 +165,13 @@ public class Floor {
      * @return 방, 복도·문·벽이면 null (자주 부르는 맵 조회라 Optional 대신 null, Team_Rules 2.9)
      */
     public Room roomAt(Position p) {
-        // TODO(D): rooms 중 contains(p) 인 방
-        throw new UnsupportedOperationException("Floor.roomAt 은 아직 구현되지 않았습니다.");
+
+        for (int i = 0; i < rooms.size(); i++) {
+            if (rooms.get(i).contains(p)) {
+                return rooms.get(i);
+            }
+        }
+        return null;
     }
 
     /**
@@ -186,8 +191,13 @@ public class Floor {
      * @return 몬스터, 없으면 null (자주 부르는 맵 조회라 Optional 대신 null, Team_Rules 2.9)
      */
     public Monster getMonsterAt(Position p) {
-        // TODO(D): monsters 중 getPos().equals(p) 인 몬스터
-        throw new UnsupportedOperationException("Floor.getMonsterAt 은 아직 구현되지 않았습니다.");
+
+        for (Monster m : monsters) {
+            if (m.getPos().equals(p)) {
+                return m;
+            }
+        }
+        return null;
     }
 
     /**
@@ -292,13 +302,17 @@ public class Floor {
         throw new UnsupportedOperationException("Floor.setVisible 은 아직 구현되지 않았습니다.");
     }
 
-    /** (P1) 모든 칸을 안 보이는 상태로 되돌린다. 매 턴 시야 계산 전에 호출한다. */
+    /**
+     * (P1) 모든 칸을 안 보이는 상태로 되돌린다. 매 턴 시야 계산 전에 호출한다.
+     */
     public void clearVisible() {
         // TODO(D): P1 시야
         throw new UnsupportedOperationException("Floor.clearVisible 은 아직 구현되지 않았습니다.");
     }
 
-    /** (P1) 모든 칸을 seen 으로 표시한다. 지도 두루마리용. */
+    /**
+     * (P1) 모든 칸을 seen 으로 표시한다. 지도 두루마리용.
+     */
     public void revealAll() {
         // TODO(D): P1 지도 두루마리
         throw new UnsupportedOperationException("Floor.revealAll 은 아직 구현되지 않았습니다.");
@@ -350,7 +364,9 @@ public class Floor {
         rooms.add(r);
     }
 
-    /** 복도 연결 전에 방을 x 좌표순으로 정렬한다. 생성기 전용. */
+    /**
+     * 복도 연결 전에 방을 x 좌표순으로 정렬한다. 생성기 전용.
+     */
     void sortRoomsByX() {
         // TODO(D): rooms.sort(Comparator.comparingInt(Room::x))
         throw new UnsupportedOperationException("Floor.sortRoomsByX 는 아직 구현되지 않았습니다.");

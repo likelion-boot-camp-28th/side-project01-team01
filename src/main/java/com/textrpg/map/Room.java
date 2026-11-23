@@ -1,6 +1,7 @@
 package com.textrpg.map;
 
 import com.textrpg.core.Position;
+import com.textrpg.util.RandomUtil;
 
 /**
  * 직사각형 방.
@@ -21,8 +22,13 @@ public record Room(int x, int y, int width, int height) {
      * @throws IllegalArgumentException 숫자가 4개가 아니거나 숫자로 바꿀 수 없을 때
      */
     public static Room fromSaveString(String s) {
-        // TODO(D): 쉼표로 나눠 정수 4개 파싱
-        throw new UnsupportedOperationException("Room.fromSaveString 은 아직 구현되지 않았습니다.");
+
+        String[] str = s.split(",");
+        if (str.length != 4) {
+            throw new IllegalArgumentException(s);
+        }
+        Room room = new Room(Integer.parseInt(str[0]), Integer.parseInt(str[1]), Integer.parseInt(str[2]), Integer.parseInt(str[3]));
+        return room;
     }
 
     /**
@@ -31,8 +37,9 @@ public record Room(int x, int y, int width, int height) {
      * @return 중심 좌표 (내부에 있는 칸)
      */
     public Position center() {
-        // TODO(D): x + width / 2, y + height / 2
-        throw new UnsupportedOperationException("Room.center 는 아직 구현되지 않았습니다.");
+
+        Position p = new Position(x + (width / 2), y + (height / 2));
+        return p;
     }
 
     /**
@@ -42,8 +49,12 @@ public record Room(int x, int y, int width, int height) {
      * @return 내부에 있으면 true
      */
     public boolean contains(Position p) {
-        // TODO(D): x <= p.x < x + width, y <= p.y < y + height
-        throw new UnsupportedOperationException("Room.contains 는 아직 구현되지 않았습니다.");
+
+        if (p.x() >= x && p.x() < x + width && p.y() >= y && p.y() < y + height) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     /**
@@ -53,8 +64,12 @@ public record Room(int x, int y, int width, int height) {
      * @return 벽 포함 영역에 있으면 true
      */
     public boolean containsWithWalls(Position p) {
-        // TODO(D): 범위를 한 칸씩 넓혀 contains 와 같은 방식으로 검사
-        throw new UnsupportedOperationException("Room.containsWithWalls 는 아직 구현되지 않았습니다.");
+
+        if (p.x() >= x - 1 && p.x() <= x + width && p.y() >= y - 1 && p.y() <= y + height) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     /**
@@ -64,8 +79,18 @@ public record Room(int x, int y, int width, int height) {
      * @return 겹치면 true
      */
     public boolean intersects(Room o) {
-        // TODO(D): 벽 포함 사각형 두 개의 겹침 판정
-        throw new UnsupportedOperationException("Room.intersects 는 아직 구현되지 않았습니다.");
+
+        if (x + width < o.x() - 1) {
+            return false;
+        } else if (x - 1 > o.x() + o.width()) {
+            return false;
+        } else if (y + height < o.y() - 1) {
+            return false;
+        } else if (y - 1 > o.y() + o.height()) {
+            return false;
+        } else {
+            return true;
+        }
     }
 
     /**
@@ -74,8 +99,9 @@ public record Room(int x, int y, int width, int height) {
      * @return 내부의 무작위 칸
      */
     public Position randomInside() {
-        // TODO(D): RandomUtil.nextInt 로 x, y 선택
-        throw new UnsupportedOperationException("Room.randomInside 는 아직 구현되지 않았습니다.");
+
+        Position p = new Position(RandomUtil.nextInt(x, x + width - 1), RandomUtil.nextInt(y, y + height - 1));
+        return p;
     }
 
     /**
@@ -84,7 +110,9 @@ public record Room(int x, int y, int width, int height) {
      * @return "x,y,width,height"
      */
     public String toSaveString() {
-        // TODO(D): 쉼표로 이어 붙이기
-        throw new UnsupportedOperationException("Room.toSaveString 은 아직 구현되지 않았습니다.");
+
+        String str = x + "," + y + "," + width + "," + height;
+        return str;
+
     }
 }
