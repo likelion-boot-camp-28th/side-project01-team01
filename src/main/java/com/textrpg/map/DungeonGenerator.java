@@ -24,6 +24,7 @@ public final class DungeonGenerator {
     private static final int MIN_ROOMS = 6;
     private static final int MAX_ROOMS = 9;
     private static final int ROOM_PLACE_TRIES = 50;
+    private static final int OUTSIDE_START_TRIES = 50;
     private static final int ROOM_MIN_W = 4;
     private static final int ROOM_MAX_W = 12;
     private static final int ROOM_MIN_H = 3;
@@ -216,11 +217,29 @@ public final class DungeonGenerator {
     }
 
     /**
+     * 시작 방을 뺀 방들에서 빈 칸을 고른다. 몬스터·아이템·골드 배치에 쓴다.
+     */
+    private static Position randomPositionOutsideStartRoom(Floor f) {
+        Room startRoom = f.roomAt(f.getStartPos());
+        for (int i = 0; i < OUTSIDE_START_TRIES; i++) {
+            Position p = f.randomFreePosition();
+            if (f.roomAt(p) != startRoom) {
+                return p;
+            }
+        }
+        throw new IllegalStateException("시작 방 밖의 빈 칸을 " + OUTSIDE_START_TRIES + "번 안에 찾지 못했습니다.");
+    }
+
+    /**
      * 시작 방을 뺀 방들에 몬스터 MIN_MONSTERS ~ MAX_MONSTERS 마리.
      */
     private static void placeMonsters(Floor f) {
-        // TODO(D): randomFreePosition(시작 방 제외) → MonsterFactory 의 층별 무작위 생성 → addMonster
-        throw new UnsupportedOperationException("DungeonGenerator.placeMonsters 는 아직 구현되지 않았습니다.");
+        int monsterNum = RandomUtil.nextInt(MIN_MONSTERS, MAX_MONSTERS);
+        for (int i = 0; i < monsterNum; i++) {
+            Position p = randomPositionOutsideStartRoom(f);
+            Monster m = MonsterFactory.createRandom(f.getLevel(), p);
+            f.addMonster(m);
+        }
     }
 
     /**
