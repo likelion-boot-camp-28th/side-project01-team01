@@ -119,8 +119,35 @@ public final class DungeonGenerator {
      * @return 성공하면 층, 방이 MIN_ROOMS 개 미만이거나 목표에 도달할 수 없으면 empty
      */
     private static Optional<Floor> tryGenerate(int level) {
-        // TODO(D): placeRooms → 방 개수 확인 → connectRooms → placeStartAndGoal → 배치 → isReachable
-        throw new UnsupportedOperationException("DungeonGenerator.tryGenerate 는 아직 구현되지 않았습니다.");
+        Floor f = new Floor(level);
+        placeRooms(f);
+        if (f.getRooms().size() < MIN_ROOMS) {
+            return Optional.empty();
+        }
+        connectRooms(f);
+        placeStartAndGoal(f);
+        placeMonsters(f);
+        placeGold(f);
+        // TODO(D): B 의 ItemFactory.createRandom 구현 후 placeItems 호출
+        if (!isReachable(f, f.getStartPos(), findGoal(f))) {
+            return Optional.empty();
+        }
+        return Optional.of(f);
+    }
+
+    /**
+     * 목표 위치. 1~4층은 계단, 5층은 보스 위치.
+     */
+    private static Position findGoal(Floor f) {
+        if (f.getStairs().isPresent()) {
+            return f.getStairs().get();
+        }
+        for (Monster m : f.getMonsters()) {
+            if (m instanceof Boss) {
+                return m.getPos();
+            }
+        }
+        throw new IllegalStateException("계단도 보스도 없는 층입니다.");
     }
 
     /**
