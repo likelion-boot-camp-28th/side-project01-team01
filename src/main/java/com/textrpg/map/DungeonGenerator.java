@@ -54,8 +54,16 @@ public final class DungeonGenerator {
      * @throws IllegalStateException    MAX_ATTEMPTS 번 연속 생성에 실패했을 때
      */
     public static Floor generate(int level) {
-        // TODO(D): level 검사 → tryGenerate 를 MAX_ATTEMPTS 번까지 반복
-        throw new UnsupportedOperationException("DungeonGenerator.generate 는 아직 구현되지 않았습니다.");
+        if (level < 1 || level > MAX_FLOOR) {
+            throw new IllegalArgumentException("층 번호는 1 ~ " + MAX_FLOOR + " 이어야 합니다: " + level);
+        }
+        for (int i = 0; i < MAX_ATTEMPTS; i++) {
+            Optional<Floor> optionalFloor = tryGenerate(level);
+            if (optionalFloor.isPresent()) {
+                return optionalFloor.get();
+            }
+        }
+        throw new IllegalStateException(level + "층 생성에 " + MAX_ATTEMPTS + "번 연속 실패했습니다.");
     }
 
     /**
