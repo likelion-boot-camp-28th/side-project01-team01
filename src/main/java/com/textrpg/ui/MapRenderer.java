@@ -39,7 +39,6 @@ public class MapRenderer {
 
     /** (x, y) 칸에 찍을 문자. 우선순위는 클래스 설명 참고. */
     private char symbolAt(Floor floor, Player player, int x, int y) {
-        // TODO(A, P1): 시야 적용 — !floor.isSeen(x, y) 면 ' ', !floor.isVisible(x, y) 면 타일만
         Position pos = new Position(x, y);
         if (player.getPos().equals(pos)) {
             return player.getSymbol();
