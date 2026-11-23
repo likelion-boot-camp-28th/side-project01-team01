@@ -1,13 +1,17 @@
 package com.textrpg.map;
 
+import com.textrpg.core.Direction;
 import com.textrpg.core.Position;
+import com.textrpg.item.FloorItem;
+import com.textrpg.monster.Boss;
 import com.textrpg.monster.Monster;
 import com.textrpg.monster.MonsterFactory;
 import com.textrpg.monster.MonsterType;
 import com.textrpg.util.RandomUtil;
 
+import java.util.ArrayDeque;
+import java.util.List;
 import java.util.Optional;
-
 
 /**
  * 층을 무작위로 생성한다. 생성 절차와 상수 값은 docs/Class-Diagram.md 5.3 참고.
@@ -23,6 +27,7 @@ public final class DungeonGenerator {
     private static final int MIN_ROOMS = 6;
     private static final int MAX_ROOMS = 9;
     private static final int ROOM_PLACE_TRIES = 50;
+    private static final int OUTSIDE_START_TRIES = 50;
     private static final int ROOM_MIN_W = 4;
     private static final int ROOM_MAX_W = 12;
     private static final int ROOM_MIN_H = 3;
@@ -49,8 +54,16 @@ public final class DungeonGenerator {
      * @throws IllegalStateException    MAX_ATTEMPTS 번 연속 생성에 실패했을 때
      */
     public static Floor generate(int level) {
-        // TODO(D): level 검사 → tryGenerate 를 MAX_ATTEMPTS 번까지 반복
-        throw new UnsupportedOperationException("DungeonGenerator.generate 는 아직 구현되지 않았습니다.");
+        if (level < 1 || level > MAX_FLOOR) {
+            throw new IllegalArgumentException("층 번호는 1 ~ " + MAX_FLOOR + " 이어야 합니다: " + level);
+        }
+        for (int i = 0; i < MAX_ATTEMPTS; i++) {
+            Optional<Floor> optionalFloor = tryGenerate(level);
+            if (optionalFloor.isPresent()) {
+                return optionalFloor.get();
+            }
+        }
+        throw new IllegalStateException(level + "층 생성에 " + MAX_ATTEMPTS + "번 연속 실패했습니다.");
     }
 
     /**
@@ -59,8 +72,6 @@ public final class DungeonGenerator {
      * @return 테스트용 층 (부를 때마다 새 객체)
      */
     public static Floor createTestFloor() {
-        // TODO(D): 방 2개 + 복도 1개를 고정 좌표로 그리고 시작 위치·계단·몬스터 1마리 배치
-
         Floor floor = new Floor(1);
         Room room1 = new Room(3, 3, 8, 5);
         Room room2 = new Room(25, 4, 10, 6);
@@ -89,8 +100,25 @@ public final class DungeonGenerator {
      * @return 갈 수 있으면 true
      */
     static boolean isReachable(Floor f, Position a, Position b) {
-        // TODO(D): BFS, 이웃은 Direction.values() 로 상하좌우, f.isWalkable 로 통행 판정
-        throw new UnsupportedOperationException("DungeonGenerator.isReachable 은 아직 구현되지 않았습니다.");
+        ArrayDeque<Position> queue = new ArrayDeque<>();
+        boolean[][] visited = new boolean[Floor.HEIGHT][Floor.WIDTH];
+
+        queue.add(a);
+        visited[a.y()][a.x()] = true;
+        while (!queue.isEmpty()) {
+            Position p = queue.poll();
+            if (p.equals(b)) {
+                return true;
+            }
+            for (Direction d : Direction.values()) {
+                Position neighbor = p.move(d);
+                if (f.isWalkable(neighbor) && !visited[neighbor.y()][neighbor.x()]) {
+                    queue.add(neighbor);
+                    visited[neighbor.y()][neighbor.x()] = true;
+                }
+            }
+        }
+        return false;
     }
 
     /**
@@ -99,16 +127,63 @@ public final class DungeonGenerator {
      * @return 성공하면 층, 방이 MIN_ROOMS 개 미만이거나 목표에 도달할 수 없으면 empty
      */
     private static Optional<Floor> tryGenerate(int level) {
-        // TODO(D): placeRooms → 방 개수 확인 → connectRooms → placeStartAndGoal → 배치 → isReachable
-        throw new UnsupportedOperationException("DungeonGenerator.tryGenerate 는 아직 구현되지 않았습니다.");
+        Floor f = new Floor(level);
+        placeRooms(f);
+        if (f.getRooms().size() < MIN_ROOMS) {
+            return Optional.empty();
+        }
+        connectRooms(f);
+        placeStartAndGoal(f);
+        placeMonsters(f);
+        placeGold(f);
+        // TODO(D): B 의 ItemFactory.createRandom 구현 후 placeItems 호출
+        if (!isReachable(f, f.getStartPos(), findGoal(f))) {
+            return Optional.empty();
+        }
+        return Optional.of(f);
+    }
+
+    /**
+     * 목표 위치. 1~4층은 계단, 5층은 보스 위치.
+     */
+    private static Position findGoal(Floor f) {
+        if (f.getStairs().isPresent()) {
+            return f.getStairs().get();
+        }
+        for (Monster m : f.getMonsters()) {
+            if (m instanceof Boss) {
+                return m.getPos();
+            }
+        }
+        throw new IllegalStateException("계단도 보스도 없는 층입니다.");
     }
 
     /**
      * ROOM_PLACE_TRIES 번 시도해 겹치지 않는 방을 MAX_ROOMS 개까지 추가하고 carveRoom 으로 그린다.
      */
     private static void placeRooms(Floor f) {
-        // TODO(D): 크기·위치 무작위 → 벽까지 맵 안인지, 기존 방과 intersects 인지 확인 → addRoom, carveRoom
-        throw new UnsupportedOperationException("DungeonGenerator.placeRooms 는 아직 구현되지 않았습니다.");
+        for (int i = 0; i < ROOM_PLACE_TRIES; i++) {
+            if (f.getRooms().size() >= MAX_ROOMS) {
+                break;
+            }
+            int w = RandomUtil.nextInt(ROOM_MIN_W, ROOM_MAX_W);
+            int h = RandomUtil.nextInt(ROOM_MIN_H, ROOM_MAX_H);
+            int x = RandomUtil.nextInt(1, Floor.WIDTH - w - 1);
+            int y = RandomUtil.nextInt(1, Floor.HEIGHT - h - 1);
+            Room room = new Room(x, y, w, h);
+            boolean isOverlapping = false;
+            for (Room r : f.getRooms()) {
+                if (r.intersects(room)) {
+                    isOverlapping = true;
+                    break;
+                }
+            }
+            if (isOverlapping) {
+                continue;
+            }
+            f.addRoom(room);
+            carveRoom(f, room);
+        }
     }
 
     /**
@@ -131,15 +206,17 @@ public final class DungeonGenerator {
      * 방을 x 좌표순으로 정렬한 뒤 i 번 방과 i+1 번 방의 중심을 L자 복도로 잇는다.
      */
     private static void connectRooms(Floor f) {
-        // TODO(D): sortRoomsByX → 이웃한 방끼리 carveCorridor(center, center)
-        throw new UnsupportedOperationException("DungeonGenerator.connectRooms 는 아직 구현되지 않았습니다.");
+        f.sortRoomsByX();
+        List<Room> rooms = f.getRooms();
+        for (int i = 0; i < rooms.size() - 1; i++) {
+            carveCorridor(f, rooms.get(i).center(), rooms.get(i + 1).center());
+        }
     }
 
     /**
      * a 에서 b 까지 L자 복도를 판다. 가로·세로 중 무엇을 먼저 팔지는 무작위.
      */
     private static void carveCorridor(Floor f, Position a, Position b) {
-        // TODO(D): RandomUtil.chance(50) 로 순서 결정 → 가로 구간, 세로 구간을 carveTile
         if (RandomUtil.chance(50)) {
             carveHorizontal(f, a.x(), b.x(), a.y());
             carveVertical(f, a.y(), b.y(), b.x());
@@ -181,16 +258,43 @@ public final class DungeonGenerator {
      * 첫 방에 시작 위치, 마지막 방에 계단. 5층은 계단 대신 MonsterFactory.createBoss 로 보스.
      */
     private static void placeStartAndGoal(Floor f) {
-        // TODO(D): setStartPos(첫 방 randomInside) → level < MAX_FLOOR 면 STAIRS_DOWN + setStairs, 아니면 보스
-        throw new UnsupportedOperationException("DungeonGenerator.placeStartAndGoal 은 아직 구현되지 않았습니다.");
+        List<Room> rooms = f.getRooms();
+        f.setStartPos(rooms.get(0).randomInside());
+
+        Position p = rooms.get(rooms.size() - 1).randomInside();
+        if (f.getLevel() < MAX_FLOOR) {
+            f.setTile(p.x(), p.y(), Tile.STAIRS_DOWN);
+            f.setStairs(p);
+        } else {
+            Boss boss = MonsterFactory.createBoss(p);
+            f.addMonster(boss);
+        }
+    }
+
+    /**
+     * 시작 방을 뺀 방들에서 빈 칸을 고른다. 몬스터·아이템·골드 배치에 쓴다.
+     */
+    private static Position randomPositionOutsideStartRoom(Floor f) {
+        Room startRoom = f.roomAt(f.getStartPos());
+        for (int i = 0; i < OUTSIDE_START_TRIES; i++) {
+            Position p = f.randomFreePosition();
+            if (f.roomAt(p) != startRoom) {
+                return p;
+            }
+        }
+        throw new IllegalStateException("시작 방 밖의 빈 칸을 " + OUTSIDE_START_TRIES + "번 안에 찾지 못했습니다.");
     }
 
     /**
      * 시작 방을 뺀 방들에 몬스터 MIN_MONSTERS ~ MAX_MONSTERS 마리.
      */
     private static void placeMonsters(Floor f) {
-        // TODO(D): randomFreePosition(시작 방 제외) → MonsterFactory 의 층별 무작위 생성 → addMonster
-        throw new UnsupportedOperationException("DungeonGenerator.placeMonsters 는 아직 구현되지 않았습니다.");
+        int monsterNum = RandomUtil.nextInt(MIN_MONSTERS, MAX_MONSTERS);
+        for (int i = 0; i < monsterNum; i++) {
+            Position p = randomPositionOutsideStartRoom(f);
+            Monster m = MonsterFactory.createRandom(f.getLevel(), p);
+            f.addMonster(m);
+        }
     }
 
     /**
@@ -205,7 +309,12 @@ public final class DungeonGenerator {
      * 시작 방을 뺀 방들에 골드 더미 MIN_GOLD_PILES ~ MAX_GOLD_PILES 개. 더미당 층 x GOLD_PER_FLOOR_MIN ~ MAX.
      */
     private static void placeGold(Floor f) {
-        // TODO(D): 골드 FloorItem 생성 → addItem (B 와 FloorItem 골드 표현 합의 필요)
-        throw new UnsupportedOperationException("DungeonGenerator.placeGold 는 아직 구현되지 않았습니다.");
+        int pileCount = RandomUtil.nextInt(MIN_GOLD_PILES, MAX_GOLD_PILES);
+        for (int i = 0; i < pileCount; i++) {
+            Position p = randomPositionOutsideStartRoom(f);
+            int amount = RandomUtil.nextInt(f.getLevel() * GOLD_PER_FLOOR_MIN, f.getLevel() * GOLD_PER_FLOOR_MAX);
+            FloorItem gold = FloorItem.gold(amount, p);
+            f.addItem(gold);
+        }
     }
 }

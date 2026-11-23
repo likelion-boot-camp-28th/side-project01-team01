@@ -3,9 +3,11 @@ package com.textrpg.map;
 import com.textrpg.core.Position;
 import com.textrpg.item.FloorItem;
 import com.textrpg.monster.Monster;
+import com.textrpg.util.RandomUtil;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
@@ -17,6 +19,7 @@ public class Floor {
 
     public static final int WIDTH = 60;
     public static final int HEIGHT = 20;
+    private static final int FREE_POSITION_TRIES = 100;
 
     private final int level;
     private final Tile[][] tiles;
@@ -116,8 +119,7 @@ public class Floor {
      * @return 타일이 FLOOR 이고 몬스터·아이템이 없고 시작 위치가 아니면 true
      */
     public boolean isFree(Position p) {
-        // TODO(D): getTile == FLOOR, getMonsterAt == null, getItemAt == null, startPos 아님
-        throw new UnsupportedOperationException("Floor.isFree 는 아직 구현되지 않았습니다.");
+        return getTile(p) == Tile.FLOOR && getMonsterAt(p) == null && getItemAt(p) == null && !p.equals(startPos);
     }
 
     /**
@@ -127,8 +129,13 @@ public class Floor {
      * @throws IllegalStateException 정해진 횟수 안에 빈 칸을 찾지 못했을 때
      */
     public Position randomFreePosition() {
-        // TODO(D): RandomUtil.pick(rooms).randomInside() 를 isFree 일 때까지 반복 (횟수 제한)
-        throw new UnsupportedOperationException("Floor.randomFreePosition 은 아직 구현되지 않았습니다.");
+        for (int i = 0; i < FREE_POSITION_TRIES; i++) {
+            Position p = RandomUtil.pick(rooms).randomInside();
+            if (isFree(p)) {
+                return p;
+            }
+        }
+        throw new IllegalStateException("빈 칸을 " + FREE_POSITION_TRIES + "번 안에 찾지 못했습니다.");
     }
 
     /**
@@ -165,7 +172,6 @@ public class Floor {
      * @return 방, 복도·문·벽이면 null (자주 부르는 맵 조회라 Optional 대신 null, Team_Rules 2.9)
      */
     public Room roomAt(Position p) {
-
         for (int i = 0; i < rooms.size(); i++) {
             if (rooms.get(i).contains(p)) {
                 return rooms.get(i);
@@ -191,7 +197,6 @@ public class Floor {
      * @return 몬스터, 없으면 null (자주 부르는 맵 조회라 Optional 대신 null, Team_Rules 2.9)
      */
     public Monster getMonsterAt(Position p) {
-
         for (Monster m : monsters) {
             if (m.getPos().equals(p)) {
                 return m;
@@ -234,8 +239,12 @@ public class Floor {
      * @return 아이템, 없으면 null (자주 부르는 맵 조회라 Optional 대신 null, Team_Rules 2.9)
      */
     public FloorItem getItemAt(Position p) {
-        // TODO(D): items 를 뒤에서부터 찾기
-        throw new UnsupportedOperationException("Floor.getItemAt 은 아직 구현되지 않았습니다.");
+        for (int i = items.size() - 1; i >= 0; i--) {
+            if (items.get(i).pos().equals(p)) {
+                return items.get(i);
+            }
+        }
+        return null;
     }
 
     /**
@@ -368,8 +377,7 @@ public class Floor {
      * 복도 연결 전에 방을 x 좌표순으로 정렬한다. 생성기 전용.
      */
     void sortRoomsByX() {
-        // TODO(D): rooms.sort(Comparator.comparingInt(Room::x))
-        throw new UnsupportedOperationException("Floor.sortRoomsByX 는 아직 구현되지 않았습니다.");
+        rooms.sort(Comparator.comparingInt(Room::x));
     }
 
     void setStartPos(Position p) {
