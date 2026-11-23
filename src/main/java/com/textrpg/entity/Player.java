@@ -174,8 +174,42 @@ public class Player extends Entity implements ItemUser {
      */
     @Override
     public String equip(Item item) {
-        // TODO(B): Weapon 이면 weapon 칸, Armor 이면 armor 칸에 끼우고, 원래 장비는 가방으로
-        throw new UnsupportedOperationException("TODO(B): Player.equip");
+        if (item instanceof Weapon) {
+            Weapon newWeapon = (Weapon) item;
+            Weapon oldWeapon = weapon;                   // ① 원래 무기 기억해 두기 (없으면 null)
+
+            int index = inventory.getItems().indexOf(newWeapon);   // ② 새 무기를 가방에서 빼기
+            if (index >= 0) {
+                inventory.remove(index);
+            }
+
+            weapon = newWeapon;
+
+            if (oldWeapon != null) {                     // ④ 원래 무기가 있었으면 가방으로
+                inventory.add(oldWeapon);
+            }
+            return newWeapon.getDisplayName() + "을(를) 장착했다.";
+
+        }
+
+        if (item instanceof Armor) {
+            Armor newArmor = (Armor) item;
+            Armor oldArmor = armor;
+
+            int index = inventory.getItems().indexOf(newArmor);
+            if (index >= 0) {
+                inventory.remove(index);
+            }
+
+            armor = newArmor;
+
+            if (oldArmor != null) {
+                inventory.add(oldArmor);
+            }
+            return newArmor.getDisplayName() + "을(를) 장착했다.";
+        }
+
+        return item.getDisplayName() + "은(는) 장착할 수 없다.";
     }
 
     /**

@@ -42,6 +42,7 @@ public final class PlayerSkeletonCheck {
         checkCreateRandom();
         checkDropItem();
         checkUseItem();
+        checkEquip();
 
         System.out.println("통과 " + passed + " / 실패 " + failed);
         if (failed > 0) {
@@ -355,6 +356,39 @@ public final class PlayerSkeletonCheck {
         check("같은 물약 2개 중 마신 것(2번)만 빠짐",
                 p.getInventory().size() == 2 && p.getInventory().get(1) == potion1);
         check("다른 아이템(철 검)은 그대로", p.getInventory().get(0) == sword);
+    }
+
+
+    private static void checkEquip() {
+        Player p = new Player("용사", Job.WARRIOR);
+        int bareAttack = p.getAttack();
+        Item sword1 = ItemFactory.createById("IRON_SWORD");
+        Item potion = ItemFactory.createById("HP_POTION_S");
+        p.getInventory().add(sword1);
+        p.getInventory().add(potion);
+
+        String message = p.useItem(0);
+        check("맨손에서 검 장착 -> 장착 문장", message.contains("장착했다"));
+        check("무기 칸에 검", p.getWeapon().isPresent() && p.getWeapon().get() == sword1);
+        check("공격력 +3", p.getAttack() == bareAttack + 3);
+        check("검은 가방에서 빠짐 (물약만 남음)", p.getInventory().size() == 1 && p.getInventory().get(0) == potion);
+
+        Item sword2 = ItemFactory.createById("IRON_SWORD");
+        p.getInventory().add(sword2);
+        p.useItem(1);
+        check("검 교체: 새 검이 무기 칸에", p.getWeapon().get() == sword2);
+        check("원래 검은 가방으로 돌아옴", p.getInventory().getItems().contains(sword1)
+                && !p.getInventory().getItems().contains(sword2) && p.getInventory().size() == 2);
+
+        Item armor = ItemFactory.createById("LEATHER_ARMOR");
+        p.getInventory().add(armor);
+        int defenseBefore = p.getDefense();
+        p.useItem(2);
+        check("갑옷 장착 -> 방어력 +2", p.getArmor().isPresent() && p.getDefense() == defenseBefore + 2);
+        check("무기는 그대로", p.getWeapon().get() == sword2);
+
+        String refuse = p.equip(potion);
+        check("물약은 장착할 수 없음", refuse.contains("장착할 수 없다"));
     }
 
 
