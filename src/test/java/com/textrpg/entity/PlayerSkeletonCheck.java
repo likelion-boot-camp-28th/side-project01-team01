@@ -39,6 +39,7 @@ public final class PlayerSkeletonCheck {
         checkBuy();
         checkApplyTo();
         checkFloorItem();
+        checkCreateRandom();
 
         System.out.println("통과 " + passed + " / 실패 " + failed);
         if (failed > 0) {
@@ -290,6 +291,34 @@ public final class PlayerSkeletonCheck {
         FloorItem sword = FloorItem.of(ItemFactory.createById("IRON_SWORD"), new Position(2, 2));
         check("무기 기호 )", !sword.isGold() && sword.symbol() == ')');
     }
+
+    private static void checkCreateRandom() {
+        com.textrpg.util.RandomUtil.setSeed(42);
+        boolean allFitFloor = true;
+        java.util.Set<String> seenOnFloor1 = new java.util.HashSet<>();
+        java.util.Set<String> seenOnFloor5 = new java.util.HashSet<>();
+        for (int i = 0; i < 200; i++) {
+            for (int floor = 1; floor <= 5; floor++) {
+                Item item = ItemFactory.createRandom(floor);
+                if (!item.canDropOn(floor)) {
+                    allFitFloor = false;
+                }
+                if (floor == 1) {
+                    seenOnFloor1.add(item.getId());
+                }
+                if (floor == 5) {
+                    seenOnFloor5.add(item.getId());
+                }
+            }
+        }
+        check("무작위 아이템은 항상 그 층에서 나올 수 있는 것", allFitFloor);
+        check("1층에서는 3종 모두 나옴", seenOnFloor1.size() == 3);
+        check("5층에서는 물약만 (검·갑옷은 1~3층)", seenOnFloor5.equals(java.util.Set.of("HP_POTION_S")));
+        Item a = ItemFactory.createRandom(1);
+        Item b = ItemFactory.createRandom(1);
+        check("부를 때마다 새 아이템 객체", a != b);
+    }
+
 
     private static void check(String name, boolean ok) {
         if (ok) {

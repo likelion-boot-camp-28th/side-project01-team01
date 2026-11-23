@@ -1,10 +1,18 @@
 package com.textrpg.item;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import com.textrpg.util.RandomUtil;
+
 /**
  * 아이템은 모두 여기서 만든다. 세이브 파일의 id 로 다시 만들 때도 같은 메서드를 쓴다.
  * 아이템 수치(보너스, 회복량)는 이 클래스 한곳에서 관리한다.
  */
 public final class ItemFactory {
+
+    /** 무작위로 고를 수 있는 모든 아이템 id. 새 아이템을 만들면 여기에도 추가한다. */
+    private static final String[] ALL_IDS = {"IRON_SWORD", "LEATHER_ARMOR", "HP_POTION_S"};
 
     private ItemFactory() {
     }
@@ -29,9 +37,17 @@ public final class ItemFactory {
 
     /**
      * 층에 맞는 아이템을 무작위로 만든다. D 의 DungeonGenerator.placeItems() 가 쓴다.
+     * 그 층에서 나올 수 있는 아이템(canDropOn)만 후보로 모아 그중 하나를 고른다.
      */
     public static Item createRandom(int floorLevel) {
-        // TODO(B): RandomUtil 로 층이 깊을수록 좋은 아이템이 나오게
-        throw new UnsupportedOperationException("TODO(B): ItemFactory.createRandom");
+        List<Item> candidates = new ArrayList<>();
+        for (String id : ALL_IDS) {
+            Item item = createById(id);
+            if (item.canDropOn(floorLevel)) {
+                candidates.add(item);
+            }
+        }
+
+        return RandomUtil.pick(candidates);
     }
 }
