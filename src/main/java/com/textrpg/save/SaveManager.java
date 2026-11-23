@@ -1,12 +1,17 @@
 package com.textrpg.save;
 
+import java.io.IOException;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
 
 /**
  * 세이브 슬롯 파일(saves/slot1.sav ~ slot3.sav)을 읽고 쓴다.
- * 1차 스켈레톤은 파일 입출력 부분만 담는다. SlotData 를 다루는 save / load / clearRun / getSlotSummary 는
- * B·C·D 스켈레톤이 develop 에 들어간 뒤 2차 PR 에서 추가한다.
  */
 public class SaveManager {
 
@@ -32,8 +37,7 @@ public class SaveManager {
      * @throws IllegalArgumentException 슬롯 번호가 범위를 벗어날 때
      */
     public boolean exists(int slot) {
-        // TODO(A)
-        throw new UnsupportedOperationException("SaveManager.exists 는 아직 구현되지 않았습니다.");
+        return Files.isRegularFile(slotFile(slot));
     }
 
     // TODO(A, 2차): save(int slot, SlotData data), load(int slot), clearRun(int slot, Profile updated),
@@ -52,23 +56,58 @@ public class SaveManager {
     }
 
     /**
-     * 파일을 UTF-8 로 읽는다.
+     * 슬롯 파일을 UTF-8 로 읽는다.
      *
+     * @throws IllegalArgumentException 슬롯 번호가 범위를 벗어날 때
      * @throws SaveLoadException 파일이 없거나 읽지 못할 때
      */
-    private List<String> readLines(Path file) {
-        // TODO(A): Files.readAllLines(file, UTF_8), IOException 은 SaveLoadException 으로 감싼다
-        throw new UnsupportedOperationException("SaveManager.readLines 는 아직 구현되지 않았습니다.");
+    List<String> readLines(int slot) {
+        Path file = slotFile(slot);
+        try {
+            return Files.readAllLines(file, StandardCharsets.UTF_8);
+        } catch (NoSuchFileException e) {
+            throw new SaveLoadException("세이브 파일이 없습니다: " + file.getFileName(), e);
+        } catch (CharacterCodingException e) {
+            throw new SaveLoadException("세이브 파일이 손상되었습니다: " + file.getFileName(), e);
+        } catch (IOException e) {
+            throw new SaveLoadException("세이브 파일을 읽을 수 없습니다: " + file.getFileName(), e);
+        }
     }
 
     /**
      * 임시 파일(slotN.sav.tmp)에 다 쓴 뒤 원래 파일과 한 번에 바꾼다. 쓰는 도중 꺼져도 기존 세이브는 남는다.
      * ATOMIC_MOVE 를 지원하지 않는 파일 시스템이면 REPLACE_EXISTING 으로만 다시 시도한다.
      *
+     * @throws IllegalArgumentException 슬롯 번호가 범위를 벗어날 때
      * @throws SaveLoadException 쓰기나 교체에 실패했을 때
      */
-    private void writeAtomically(Path file, List<String> lines) {
-        // TODO(A): saveDir 생성 → file + TEMP_SUFFIX 에 쓰기 → Files.move(REPLACE_EXISTING, ATOMIC_MOVE)
-        throw new UnsupportedOperationException("SaveManager.writeAtomically 는 아직 구현되지 않았습니다.");
+    void writeLines(int slot, List<String> lines) {
+        if (lines == null) {
+            throw new IllegalArgumentException("lines 가 null 입니다.");
+        }
+        Path file = slotFile(slot);
+        Path tmp = file.resolveSibling(file.getFileName() + TEMP_SUFFIX);
+        try {
+            Files.createDirectories(saveDir);
+            Files.write(tmp, lines, StandardCharsets.UTF_8);
+            moveReplacing(tmp, file);
+        } catch (IOException e) {
+            SaveLoadException failure = new SaveLoadException("세이브 파일을 저장하지 못했습니다: " + file.getFileName(), e);
+            try {
+                Files.deleteIfExists(tmp);
+            } catch (IOException cleanUp) {
+                // 정리 실패는 원래 오류보다 덜 중요하므로 원래 예외에 붙여 둔다.
+                failure.addSuppressed(cleanUp);
+            }
+            throw failure;
+        }
+    }
+
+    private static void moveReplacing(Path tmp, Path file) throws IOException {
+        try {
+            Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } catch (AtomicMoveNotSupportedException e) {
+            Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
+        }
     }
 }

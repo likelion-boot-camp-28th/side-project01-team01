@@ -1,8 +1,8 @@
 package com.textrpg.game;
 
-import com.textrpg.core.Direction;
-
 import java.util.List;
+
+import com.textrpg.core.Direction;
 
 /**
  * CommandParser / Command 확인용. JUnit 대신 main 으로 실행한다 (Team_Rules 2.11).

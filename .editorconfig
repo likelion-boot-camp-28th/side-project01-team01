@@ -1,0 +1,91 @@
+# ============================================================
+# Into the Dark - 에디터 설정 (docs/Team_Rules.md 2장 코드 컨벤션 기준)
+# IntelliJ 는 이 파일을 자동으로 읽어 코드 스타일 설정보다 우선 적용한다.
+# (Settings → Editor → Code Style → "Enable EditorConfig support" 가 켜져 있어야 한다. 기본값은 켜짐)
+# ============================================================
+root = true
+
+# 2.1 파일과 인코딩: UTF-8, LF, 파일 끝 빈 줄 하나
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+# Markdown 은 줄 끝 공백 두 칸이 줄바꿈이라 지우지 않는다
+[*.md]
+trim_trailing_whitespace = false
+
+# Windows 배치 파일은 .gitattributes 와 같이 CRLF
+[*.bat]
+end_of_line = crlf
+
+[*.java]
+# 2.3 포맷: 스페이스 4칸, 한 줄 최대 120자, 줄을 바꾸면 8칸 들여쓰기
+indent_size = 4
+tab_width = 4
+max_line_length = 120
+ij_continuation_indent_size = 8
+ij_visual_guides = 120
+ij_wrap_on_typing = false
+
+# 2.3 포맷: K&R 중괄호 (여는 중괄호는 같은 줄 끝)
+ij_java_brace_style = end_of_line
+ij_java_class_brace_style = end_of_line
+ij_java_method_brace_style = end_of_line
+ij_java_lambda_brace_style = end_of_line
+
+# 2.3 포맷: if / for / while 은 한 줄이어도 중괄호 필수 (Ctrl+Alt+L 시 자동으로 추가)
+ij_java_if_brace_force = always
+ij_java_for_brace_force = always
+ij_java_while_brace_force = always
+ij_java_doWhile_brace_force = always
+
+# 2.3 포맷: 한 줄에 문장 하나, 메서드 사이 빈 줄 하나
+ij_java_keep_simple_blocks_in_one_line = false
+ij_java_keep_simple_methods_in_one_line = false
+ij_java_keep_simple_lambdas_in_one_line = true
+ij_java_keep_simple_classes_in_one_line = false
+ij_java_keep_control_statement_in_one_line = false
+ij_java_blank_lines_around_method = 1
+ij_java_blank_lines_around_method_in_interface = 1
+
+# 2.3 포맷: 키워드와 괄호 사이, 이항 연산자 앞뒤, 쉼표 뒤 공백 — if (hp <= 0) {, a + b, foo(x, y)
+ij_java_space_before_if_parentheses = true
+ij_java_space_before_for_parentheses = true
+ij_java_space_before_while_parentheses = true
+ij_java_space_before_switch_parentheses = true
+ij_java_space_before_catch_parentheses = true
+ij_java_space_before_try_parentheses = true
+ij_java_space_before_synchronized_parentheses = true
+ij_java_space_around_assignment_operators = true
+ij_java_space_around_equality_operators = true
+ij_java_space_around_relational_operators = true
+ij_java_space_around_logical_operators = true
+ij_java_space_around_additive_operators = true
+ij_java_space_around_multiplicative_operators = true
+ij_java_space_around_bitwise_operators = true
+ij_java_space_around_shift_operators = true
+ij_java_space_around_lambda_arrow = true
+ij_java_space_after_comma = true
+ij_java_space_before_comma = false
+ij_java_space_after_type_cast = true
+
+# 2.3 포맷: 120자를 넘으면 연산자·쉼표 "뒤"에서 줄을 바꾼다 (연산자는 윗줄 끝에 남김)
+ij_java_binary_operation_sign_on_next_line = false
+ij_java_ternary_operation_signs_on_next_line = false
+
+# 2.4 import: 와일드카드 금지 (같은 패키지를 999개 import 해도 * 로 합치지 않음)
+ij_java_use_single_class_imports = true
+ij_java_class_count_to_use_import_on_demand = 999
+ij_java_names_count_to_use_import_on_demand = 999
+
+# 2.4 import 순서: java.* → 그 외 → 프로젝트(com.textrpg.*) → static, 그룹 사이 빈 줄 하나
+ij_java_imports_layout = java.**,javax.**,|,*,|,com.textrpg.**,|,$*
+ij_java_layout_static_imports_separately = true
+
+[*.gradle]
+indent_size = 4
+ij_continuation_indent_size = 8
