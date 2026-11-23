@@ -182,8 +182,7 @@ public class Player extends Entity implements ItemUser {
      * 가방의 index 번 아이템을 사용한다. 결과 문장을 돌려준다.
      */
     public String useItem(int index) {
-        // TODO(B): inventory.get(index).use(this)
-        throw new UnsupportedOperationException("TODO(B): Player.useItem");
+        return inventory.get(index).use(this);
     }
 
     /**

@@ -41,6 +41,7 @@ public final class PlayerSkeletonCheck {
         checkFloorItem();
         checkCreateRandom();
         checkDropItem();
+        checkUseItem();
 
         System.out.println("통과 " + passed + " / 실패 " + failed);
         if (failed > 0) {
@@ -332,6 +333,16 @@ public final class PlayerSkeletonCheck {
         check("버린 아이템을 돌려줌 (0번 = 철 검)", dropped == sword);
         check("가방에서 빠짐 (2개 -> 1개)", p.getInventory().size() == 1);
         check("남은 아이템이 0번으로 당겨짐", p.getInventory().get(0) == potion);
+    }
+
+
+    private static void checkUseItem() {
+        Player p = new Player("용사", Job.WARRIOR);
+        p.getInventory().add(ItemFactory.createById("HP_POTION_S"));
+        p.takeDamage(15);
+        String message = p.useItem(0);
+        check("가방 0번 물약 사용 -> HP 15 -> 25", p.getStats().getHp() == 25);
+        check("물약의 결과 문장을 그대로 돌려줌", message.contains("HP 를 10"));
     }
 
 
