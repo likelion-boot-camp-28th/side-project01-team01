@@ -1,16 +1,18 @@
 package com.textrpg.map;
 
 import com.textrpg.core.Position;
+import com.textrpg.item.FloorItem;
 import com.textrpg.monster.Boss;
 import com.textrpg.monster.Monster;
 import com.textrpg.util.RandomUtil;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * DungeonGenerator / Floor 확인용. JUnit 대신 main 으로 실행한다 (Team_Rules 2.11).
  * 실패가 하나라도 있으면 종료 코드 1.
- * 생성 로직을 구현한 뒤 build.gradle 의 checkClasses 에 추가한다 (지금 넣으면 build 가 실패한다).
  */
 public final class DungeonGeneratorCheck {
 
@@ -127,10 +129,47 @@ public final class DungeonGeneratorCheck {
      * 몬스터·바닥 아이템(골드) 규칙.
      */
     private static void checkEntities(Floor f, String where) {
-        // TODO(D): 일반 몬스터(Boss 제외) 4 ~ 8마리
-        // TODO(D): 골드 더미 2 ~ 4개 (placeItems 구현 후 아이템 개수도)
-        // TODO(D): 몬스터·아이템이 서로 같은 칸에 없음 (HashSet<Position> 의 add 가 false 면 중복)
-        // TODO(D): 시작 위치에 몬스터·아이템 없음, 시작 방에 일반 몬스터 없음
+        int monsterCount = 0;
+        List<Monster> monsters = f.getMonsters();
+        for (Monster m : monsters) {
+            if (!(m instanceof Boss)) {
+                monsterCount++;
+            }
+        }
+        check(monsterCount >= 4 && monsterCount <= 8, where, "일반 몬스터가 4~8마리가 아님: " + monsterCount);
+
+        // TODO(D): placeItems 구현 후 일반 아이템 3~6개 확인
+        List<FloorItem> items = f.getItems();
+        int goldCount = 0;
+        for (FloorItem item : items) {
+            if (item.isGold()) {
+                goldCount++;
+            }
+        }
+        check(goldCount >= 2 && goldCount <= 4, where, "골드 더미가 2~4개가 아님: " + goldCount);
+
+        Set<Position> occupied = new HashSet<>();
+        for (Monster m : monsters) {
+            check(occupied.add(m.getPos()), where, "같은 칸에 겹침: " + m.getPos());
+        }
+        for (FloorItem item : items) {
+            check(occupied.add(item.pos()), where, "같은 칸에 겹침: " + item.pos());
+        }
+
+        Position start = f.getStartPos();
+        check(!occupied.contains(start), where, "시작 위치에 몬스터·아이템 있음: " + start);
+
+        // 시작 위치가 방 밖이면 아래 검사는 건너뛴다. 실패는 여기서 기록된다.
+        Room startRoom = f.roomAt(start);
+        check(startRoom != null, where, "시작 위치가 방 안에 없음: " + start);
+        if (startRoom != null) {
+            for (Monster m : monsters) {
+                check(!startRoom.contains(m.getPos()), where, "시작 방에 몬스터 있음: " + m.getPos());
+            }
+            for (FloorItem item : items) {
+                check(!startRoom.contains(item.pos()), where, "시작 방에 아이템 있음: " + item.pos());
+            }
+        }
     }
 
     /**
