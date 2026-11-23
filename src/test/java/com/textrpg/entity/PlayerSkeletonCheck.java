@@ -31,6 +31,7 @@ public final class PlayerSkeletonCheck {
         checkLevelUp();
         checkRegenerate();
         checkEquipUse();
+        checkPotionUse();
         checkUpgradeCost();
         checkProfileAndRun();
         checkShards();
@@ -107,6 +108,20 @@ public final class PlayerSkeletonCheck {
         Item armor = ItemFactory.createById("LEATHER_ARMOR");
         armor.use(user);
         check("방어구 사용 = 장착 요청", user.equipped == armor);
+    }
+
+    private static void checkPotionUse() {
+        Item potion = ItemFactory.createById("HP_POTION_S");
+        Player p = new Player("용사", Job.WARRIOR);
+        p.takeDamage(15);
+        String message = potion.use(p);
+        check("물약 HP 10 회복 (15 -> 25)", p.getStats().getHp() == 25);
+        check("물약 문장에 실제 회복량 10", message.contains("HP 를 10"));
+
+        p.getStats().setHp(27);
+        message = potion.use(p);
+        check("최대 HP 를 넘지 않음 (27 -> 30)", p.getStats().getHp() == 30);
+        check("문장에는 실제로 오른 3 만", message.contains("HP 를 3"));
     }
 
     /** equip() 이 아직 TODO 라서, 무기·방어구 use() 만 확인하려고 쓰는 가짜 사용자. */
