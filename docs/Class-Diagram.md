@@ -163,7 +163,7 @@ classDiagram
         -boolean ansiClear
         +clearScreen()
         +render(GameContext ctx)
-        +printStatusBar(Player p, int floorLevel, int turn)
+        +printStatusBar(Player p)
         +printInventory(Inventory inv)
         +printHelp()
         +printAltar(Profile profile)

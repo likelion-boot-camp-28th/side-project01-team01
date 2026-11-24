@@ -1,0 +1,202 @@
+package com.textrpg.ui;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+import com.textrpg.core.Position;
+import com.textrpg.entity.Job;
+import com.textrpg.entity.Player;
+import com.textrpg.item.FloorItem;
+import com.textrpg.map.DungeonGenerator;
+import com.textrpg.map.Floor;
+import com.textrpg.map.Tile;
+import com.textrpg.monster.Monster;
+import com.textrpg.monster.MonsterFactory;
+import com.textrpg.monster.MonsterType;
+
+/**
+ * MapRenderer 와 ConsoleView 의 문자열 생성(formatHeader, formatStatusBar) 확인용.
+ * JUnit 대신 main 으로 실행한다 (Team_Rules 2.11). 실패가 하나라도 있으면 종료 코드 1.
+ */
+public final class MapRendererCheck {
+
+    private static int passed;
+    private static int failed;
+
+    private MapRendererCheck() {
+    }
+
+    public static void main(String[] args) {
+        checkSize();
+        checkTiles();
+        checkPlayer();
+        checkMonsterAndItem();
+        checkPriority();
+        checkStatusBar();
+        checkHeader();
+
+        System.out.println("통과 " + passed + " / 실패 " + failed);
+        if (failed > 0) {
+            System.exit(1);
+        }
+    }
+
+    private static void checkSize() {
+        Floor floor = DungeonGenerator.createTestFloor();
+        List<String> lines = new MapRenderer().render(floor, playerAtStart(floor));
+
+        expect("줄 수", lines.size(), Floor.HEIGHT);
+        for (int y = 0; y < lines.size(); y++) {
+            expect(y + "번 줄 길이", lines.get(y).length(), Floor.WIDTH);
+        }
+        expectThrows("돌려준 목록은 수정 불가", UnsupportedOperationException.class, () -> lines.add("x"));
+    }
+
+    /** 아무것도 없는 칸은 타일 기호를 그대로 찍는다. */
+    private static void checkTiles() {
+        Floor floor = DungeonGenerator.createTestFloor();
+        Player player = playerAtStart(floor);
+        List<String> lines = new MapRenderer().render(floor, player);
+
+        int mismatches = 0;
+        for (int y = 0; y < Floor.HEIGHT; y++) {
+            for (int x = 0; x < Floor.WIDTH; x++) {
+                Position p = new Position(x, y);
+                boolean occupied = player.getPos().equals(p)
+                        || floor.getMonsterAt(p) != null
+                        || floor.getItemAt(p) != null;
+                if (!occupied && charAt(lines, p) != floor.getTile(x, y).getDisplayChar()) {
+                    mismatches++;
+                }
+            }
+        }
+        expect("빈 칸은 모두 타일 기호", mismatches, 0);
+
+        floor.getStairs().ifPresentOrElse(
+                stairs -> expect("계단", charAt(lines, stairs), Tile.STAIRS_DOWN.getDisplayChar()),
+                () -> expect("테스트 층에 계단이 있음", false, true));
+        expect("맵 바깥 ROCK 은 공백", charAt(lines, new Position(0, 0)), ' ');
+    }
+
+    private static void checkPlayer() {
+        Floor floor = DungeonGenerator.createTestFloor();
+        Player player = playerAtStart(floor);
+        List<String> lines = new MapRenderer().render(floor, player);
+
+        expect("플레이어 위치에 @", charAt(lines, player.getPos()), Player.SYMBOL);
+        expect("@ 는 한 번만", countChar(lines, Player.SYMBOL), 1);
+    }
+
+    private static void checkMonsterAndItem() {
+        Floor floor = DungeonGenerator.createTestFloor();
+        Player player = playerAtStart(floor);
+        List<Position> free = freeFloorPositions(floor, player, 2);
+        Monster goblin = MonsterFactory.create(MonsterType.GOBLIN, free.get(0));
+        floor.addMonster(goblin);
+        floor.addItem(FloorItem.gold(10, free.get(1)));
+
+        List<String> lines = new MapRenderer().render(floor, player);
+        expect("몬스터 기호", charAt(lines, free.get(0)), goblin.getSymbol());
+        expect("골드 기호", charAt(lines, free.get(1)), '$');
+    }
+
+    /** 겹친 칸: 플레이어 > 몬스터 > 바닥 아이템 > 타일. */
+    private static void checkPriority() {
+        Floor floor = DungeonGenerator.createTestFloor();
+        Player player = playerAtStart(floor);
+        Position underPlayer = player.getPos();
+        Position shared = freeFloorPositions(floor, player, 1).get(0);
+
+        floor.addItem(FloorItem.gold(5, underPlayer));
+        floor.addItem(FloorItem.gold(5, shared));
+        Monster goblin = MonsterFactory.create(MonsterType.GOBLIN, shared);
+        floor.addMonster(goblin);
+
+        List<String> lines = new MapRenderer().render(floor, player);
+        expect("플레이어 + 아이템 → @", charAt(lines, underPlayer), Player.SYMBOL);
+        expect("몬스터 + 아이템 → 몬스터", charAt(lines, shared), goblin.getSymbol());
+    }
+
+    private static void checkStatusBar() {
+        Player player = new Player("테스트", Job.WARRIOR);
+        String expectedStart = ConsoleView.bar("HP", player.getStats().getHp(), player.getStats().getMaxHp(), 10);
+        String line = ConsoleView.formatStatusBar(player);
+
+        expect("HP 막대로 시작", line.startsWith(expectedStart), true);
+        expect("MP", line.contains("MP " + player.getStats().getMp() + "/" + player.getStats().getMaxMp()), true);
+        expect("레벨", line.contains("Lv." + player.getLevel()), true);
+        expect("공격(장비 합산)", line.contains("공격 " + player.getAttack()), true);
+        expect("방어(장비 합산)", line.contains("방어 " + player.getDefense()), true);
+        expect("골드", line.contains("골드 " + player.getGold()), true);
+
+        player.takeDamage(player.getStats().getMaxHp());
+        expect("HP 0 이면 빈 막대", ConsoleView.formatStatusBar(player).contains("[----------]"), true);
+        expect("막대 32/40", ConsoleView.bar("HP", 32, 40, 10), "HP 32/40 [########--]");
+    }
+
+    private static void checkHeader() {
+        expect("헤더", ConsoleView.formatHeader(2, 214), " Into the Dark - 지하 2층  |  턴 214");
+    }
+
+    private static Player playerAtStart(Floor floor) {
+        Player player = new Player("테스트", Job.WARRIOR);
+        player.setPos(floor.getStartPos());
+        return player;
+    }
+
+    /** 플레이어·몬스터·아이템·계단이 없는 바닥 칸을 count 개 고른다. */
+    private static List<Position> freeFloorPositions(Floor floor, Player player, int count) {
+        List<Position> result = new ArrayList<>();
+        for (int y = 0; y < Floor.HEIGHT && result.size() < count; y++) {
+            for (int x = 0; x < Floor.WIDTH && result.size() < count; x++) {
+                Position p = new Position(x, y);
+                if (floor.getTile(x, y) == Tile.FLOOR && !player.getPos().equals(p)
+                        && floor.getMonsterAt(p) == null && floor.getItemAt(p) == null) {
+                    result.add(p);
+                }
+            }
+        }
+        if (result.size() < count) {
+            throw new IllegalStateException("테스트 층에 빈 바닥 칸이 부족합니다: " + result.size());
+        }
+        return result;
+    }
+
+    private static char charAt(List<String> lines, Position p) {
+        return lines.get(p.y()).charAt(p.x());
+    }
+
+    private static int countChar(List<String> lines, char c) {
+        int count = 0;
+        for (String line : lines) {
+            count += (int) line.chars().filter(ch -> ch == c).count();
+        }
+        return count;
+    }
+
+    private static void expect(String name, Object actual, Object expected) {
+        if (Objects.equals(actual, expected)) {
+            passed++;
+        } else {
+            failed++;
+            System.out.println("[실패] " + name + ": 기대 " + expected + " / 실제 " + actual);
+        }
+    }
+
+    private static void expectThrows(String name, Class<? extends RuntimeException> expected, Runnable action) {
+        try {
+            action.run();
+            failed++;
+            System.out.println("[실패] " + name + ": " + expected.getSimpleName() + " 이 나지 않음");
+        } catch (RuntimeException e) {
+            if (expected.isInstance(e)) {
+                passed++;
+            } else {
+                failed++;
+                System.out.println("[실패] " + name + ": 기대 " + expected.getSimpleName()
+                        + " / 실제 " + e.getClass().getSimpleName());
+            }
+        }
+    }
+}

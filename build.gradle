@@ -33,6 +33,7 @@ def checkClasses = [
         'com.textrpg.save.SaveFileParserCheck',
         'com.textrpg.save.SaveFileWriterCheck',
         'com.textrpg.save.SaveManagerCheck',
+        'com.textrpg.ui.MapRendererCheck',
 ]
 
 tasks.named('test') {
