@@ -4,22 +4,23 @@ import com.textrpg.core.Position;
 
 /**
  * 5층 보스 어둠의 파수꾼(ABYSS_WARDEN).
- * 기본적으로 2회 공격하지만 HP가 절반 이하로 떨어지면 분노 상태가 되어 체력을 재생하고 한 턴에 세 번 공격한다.
+ * 평소에는 한 턴에 1회 공격하지만 HP가 절반 이하로 떨어지면 분노 상태가 되어 체력을 재생하고 한 턴에 두 번 공격한다.
+ * 공격 횟수는 speed 와 상관없이 여기서 정한다 (speed 는 명중·치명·회피율에만 쓰인다).
  * MonsterFactory.create(ABYSS_WARDEN, ...) 또는 createBoss()로 생성한다.
  */
 public class Boss extends Monster {
 
     private static final int ENRAGE_HP_DIVISOR = 2;
-    private static final int ENRAGED_ATTACK = 3;
-    private static final int NORMAL_ATTACK = 2;
-    private static final int ENRAGED_HEAL = 5;
+    private static final int ENRAGED_ATTACK = 2;
+    private static final int NORMAL_ATTACK = 1;
+    private static final int ENRAGED_HEAL = 2;
 
     Boss(Position pos) {
         super(MonsterType.ABYSS_WARDEN, pos);
     }
 
     /**
-     * 이번 턴에 공격할 횟수. HP가 최대 HP의 절반 이하면 3회, 아니면 2회다.
+     * 이번 턴에 공격할 횟수. HP가 최대 HP의 절반 이하면 2회, 아니면 1회다.
      *
      * @return 이번 턴 공격 횟수
      */
