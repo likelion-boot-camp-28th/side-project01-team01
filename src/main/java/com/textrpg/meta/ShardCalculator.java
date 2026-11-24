@@ -1,6 +1,7 @@
 package com.textrpg.meta;
 
 import java.util.List;
+import java.util.ArrayList;
 
 /**
  * 탐험이 끝났을 때 받을 파편을 계산한다 (기획서 2.6 파편 획득 공식).
@@ -36,7 +37,23 @@ public final class ShardCalculator {
      * 결과 화면에 보여 줄 항목별 내역. 예: "도달 층 3 × 10 = 30"
      */
     public static List<String> breakdown(RunResult r, Profile p) {
-        // TODO(B): calculate 와 같은 항목을 문장으로
-        throw new UnsupportedOperationException("TODO(B): ShardCalculator.breakdown");
+
+        List<String> lines = new ArrayList<>();
+
+        int floor = r.getDeepestFloor();
+        lines.add("도달 층 " + floor + " × " + SHARDS_PER_FLOOR + " = " + (floor * SHARDS_PER_FLOOR));
+        int kills = r.getKills();
+        lines.add("처치 " + kills + " × " + SHARDS_PER_KILL + " = " + (kills * SHARDS_PER_KILL));
+        int level = r.getFinalLevel();
+        lines.add("레벨 " + level + " × " + SHARDS_PER_LEVEL + " = " + (level * SHARDS_PER_LEVEL));
+        int gold = r.getGold();
+        lines.add("골드 " + gold + " ÷ " + GOLD_PER_SHARD + " = " + (gold / GOLD_PER_SHARD));
+
+        if (r.isVictory() == true) {
+            lines.add("클리어포인트 = " + CLEAR_BONUS);
+        }
+        lines.add("합계 = " + calculate(r, p));
+        return lines;
     }
 }
+

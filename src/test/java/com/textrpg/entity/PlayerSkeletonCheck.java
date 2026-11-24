@@ -31,11 +31,15 @@ public final class PlayerSkeletonCheck {
         checkLevelUp();
         checkRegenerate();
         checkEquipUse();
+        checkPotionUse();
         checkUpgradeCost();
         checkProfileAndRun();
         checkShards();
+        checkBreakdown();
         checkBuy();
+        checkApplyTo();
         checkFloorItem();
+        checkCreateRandom();
 
         System.out.println("통과 " + passed + " / 실패 " + failed);
         if (failed > 0) {
@@ -107,6 +111,20 @@ public final class PlayerSkeletonCheck {
         Item armor = ItemFactory.createById("LEATHER_ARMOR");
         armor.use(user);
         check("방어구 사용 = 장착 요청", user.equipped == armor);
+    }
+
+    private static void checkPotionUse() {
+        Item potion = ItemFactory.createById("HP_POTION_S");
+        Player p = new Player("용사", Job.WARRIOR);
+        p.takeDamage(15);
+        String message = potion.use(p);
+        check("물약 HP 10 회복 (15 -> 25)", p.getStats().getHp() == 25);
+        check("물약 문장에 실제 회복량 10", message.contains("HP 를 10"));
+
+        p.getStats().setHp(27);
+        message = potion.use(p);
+        check("최대 HP 를 넘지 않음 (27 -> 30)", p.getStats().getHp() == 30);
+        check("문장에는 실제로 오른 3 만", message.contains("HP 를 3"));
     }
 
     /** equip() 이 아직 TODO 라서, 무기·방어구 use() 만 확인하려고 쓰는 가짜 사용자. */
@@ -200,6 +218,33 @@ public final class PlayerSkeletonCheck {
         check("최고 층은 5 그대로 (2층 판이 덮어쓰지 않음)", profile.getBestFloor() == 5);
     }
 
+    private static void checkBreakdown() {
+        Player p = new Player("용사", Job.WARRIOR);
+        p.gainExp(120);
+        p.addGold(57);
+        RunResult run = new RunResult();
+        run.reachFloor(3);
+        for (int i = 0; i < 14; i++) {
+            run.addKill();
+        }
+        run.finish(p, false, "오크에게 사망");
+        java.util.List<String> lines = ShardCalculator.breakdown(run, Profile.newProfile());
+        check("내역 5줄 (층·처치·레벨·골드·합계)", lines.size() == 5);
+        check("첫 줄: 도달 층 3 × 10 = 30", lines.get(0).equals("도달 층 3 × 10 = 30"));
+        check("처치 줄 = 14", lines.get(1).startsWith("처치 14") && lines.get(1).endsWith("= 14"));
+        check("레벨 줄 = 12", lines.get(2).startsWith("레벨 4") && lines.get(2).endsWith("= 12"));
+        check("골드 줄 = 5", lines.get(3).startsWith("골드 57") && lines.get(3).endsWith("= 5"));
+        check("마지막 줄: 합계 = 61", lines.get(4).equals("합계 = 61"));
+
+        RunResult clear = new RunResult();
+        clear.reachFloor(5);
+        clear.finish(p, true, "");
+        java.util.List<String> clearLines = ShardCalculator.breakdown(clear, Profile.newProfile());
+        check("클리어하면 보너스 줄이 하나 더 (6줄)", clearLines.size() == 6);
+        check("보너스 줄에 100", clearLines.get(4).contains("100"));
+        check("클리어 합계 = 167", clearLines.get(5).equals("합계 = 167"));
+    }
+
     private static void checkBuy() {
         Profile profile = Profile.newProfile();
         check("파편 0 이면 못 삼", !profile.buy(UpgradeType.MAX_HP) && profile.getLevel(UpgradeType.MAX_HP) == 0);
@@ -214,12 +259,66 @@ public final class PlayerSkeletonCheck {
         check("해금은 1단계가 최대라 또 못 삼", !profile.buy(UpgradeType.UNLOCK_MAGE));
     }
 
+    private static void checkApplyTo() {
+        Player plain = new Player("용사", Job.WARRIOR);
+        Profile empty = Profile.newProfile();
+        Player same = new Player("용사", Job.WARRIOR);
+        empty.applyTo(same);
+        check("강화 없으면 스탯 그대로",
+                same.getStats().getMaxHp() == plain.getStats().getMaxHp()
+                        && same.getStats().getAttack() == plain.getStats().getAttack()
+                        && same.getStats().getDefense() == plain.getStats().getDefense());
+
+        Profile profile = Profile.newProfile();
+        profile.recordRun(new RunResult(), 120);
+        profile.buy(UpgradeType.MAX_HP);
+        profile.buy(UpgradeType.MAX_HP);
+        profile.buy(UpgradeType.ATTACK);
+        profile.buy(UpgradeType.DEFENSE);
+        check("구매: HP 2단계, 공격 1, 방어 1 (20+40+30+30 = 120)", profile.getShards() == 0);
+
+        Player p = new Player("용사", Job.WARRIOR);
+        profile.applyTo(p);
+        check("최대 HP +10 (30 -> 40)", p.getStats().getMaxHp() == 40);
+        check("현재 HP 도 40 으로 꽉 참", p.getStats().getHp() == 40);
+        check("공격 +1", p.getStats().getAttack() == plain.getStats().getAttack() + 1);
+        check("방어 +1", p.getStats().getDefense() == plain.getStats().getDefense() + 1);
+    }
+
     private static void checkFloorItem() {
         FloorItem goldPile = FloorItem.gold(30, new Position(1, 1));
         check("골드 더미 기호 $", goldPile.isGold() && goldPile.symbol() == '$');
         FloorItem sword = FloorItem.of(ItemFactory.createById("IRON_SWORD"), new Position(2, 2));
         check("무기 기호 )", !sword.isGold() && sword.symbol() == ')');
     }
+
+    private static void checkCreateRandom() {
+        com.textrpg.util.RandomUtil.setSeed(42);
+        boolean allFitFloor = true;
+        java.util.Set<String> seenOnFloor1 = new java.util.HashSet<>();
+        java.util.Set<String> seenOnFloor5 = new java.util.HashSet<>();
+        for (int i = 0; i < 200; i++) {
+            for (int floor = 1; floor <= 5; floor++) {
+                Item item = ItemFactory.createRandom(floor);
+                if (!item.canDropOn(floor)) {
+                    allFitFloor = false;
+                }
+                if (floor == 1) {
+                    seenOnFloor1.add(item.getId());
+                }
+                if (floor == 5) {
+                    seenOnFloor5.add(item.getId());
+                }
+            }
+        }
+        check("무작위 아이템은 항상 그 층에서 나올 수 있는 것", allFitFloor);
+        check("1층에서는 3종 모두 나옴", seenOnFloor1.size() == 3);
+        check("5층에서는 물약만 (검·갑옷은 1~3층)", seenOnFloor5.equals(java.util.Set.of("HP_POTION_S")));
+        Item a = ItemFactory.createRandom(1);
+        Item b = ItemFactory.createRandom(1);
+        check("부를 때마다 새 아이템 객체", a != b);
+    }
+
 
     private static void check(String name, boolean ok) {
         if (ok) {

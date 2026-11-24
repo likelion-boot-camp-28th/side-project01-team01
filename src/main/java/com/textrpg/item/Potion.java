@@ -25,7 +25,9 @@ public class Potion extends Item {
 
     @Override
     public String use(ItemUser user) {
-        // TODO(B): user.heal(hpRestore), user.restoreMp(mpRestore), user.getInventory() 에서 제거 후 "HP 를 10 회복했다." 같은 문장 돌려주기
-        throw new UnsupportedOperationException("TODO(B): Potion.use");
+        int healed = user.heal(hpRestore);
+        int restored = user.restoreMp(mpRestore);
+        // TODO(B): 가방 작업 때 가방에서 제거
+        return "HP 를 " + healed + " 회복했다. MP 를 " + restored + " 회복했다.";
     }
 }
