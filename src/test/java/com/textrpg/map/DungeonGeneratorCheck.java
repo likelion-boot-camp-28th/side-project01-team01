@@ -126,7 +126,7 @@ public final class DungeonGeneratorCheck {
     }
 
     /**
-     * 몬스터·바닥 아이템(골드) 규칙.
+     * 몬스터·바닥 아이템(일반 아이템·골드) 규칙.
      */
     private static void checkEntities(Floor f, String where) {
         int monsterCount = 0;
@@ -138,8 +138,15 @@ public final class DungeonGeneratorCheck {
         }
         check(monsterCount >= 4 && monsterCount <= 8, where, "일반 몬스터가 4~8마리가 아님: " + monsterCount);
 
-        // TODO(D): placeItems 구현 후 일반 아이템 3~6개 확인
         List<FloorItem> items = f.getItems();
+        int itemCount = 0;
+        for (FloorItem item : items) {
+            if (!item.isGold()) {
+                itemCount++;
+            }
+        }
+        check(itemCount >= 3 && itemCount <= 6, where, "일반 아이템이 3~6개가 아님: " + itemCount);
+
         int goldCount = 0;
         for (FloorItem item : items) {
             if (item.isGold()) {
