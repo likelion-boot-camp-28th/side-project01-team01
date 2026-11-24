@@ -19,6 +19,7 @@ import com.textrpg.core.Position;
 import com.textrpg.entity.Job;
 import com.textrpg.entity.Player;
 import com.textrpg.item.FloorItem;
+import com.textrpg.item.Inventory;
 import com.textrpg.item.ItemFactory;
 import com.textrpg.map.DungeonGenerator;
 import com.textrpg.map.Floor;
@@ -58,6 +59,9 @@ public final class SaveManagerCheck {
         withTempDir(SaveManagerCheck::checkSlotSummary);
         withTempDir(SaveManagerCheck::checkBrokenProfile);
         withTempDir(SaveManagerCheck::checkRunEncode);
+        withTempDir(SaveManagerCheck::checkRunRoundTrip);
+        withTempDir(SaveManagerCheck::checkBrokenRun);
+        withTempDir(SaveManagerCheck::checkRunModifiers);
         checkRunResultRestore();
 
         System.out.println("통과 " + passed + " / 실패 " + failed);
@@ -262,30 +266,9 @@ public final class SaveManagerCheck {
     }
 
     private static void checkRunEncode(Path root) {
-        Player player = new Player("용사", Job.WARRIOR);
-        player.getInventory().add(ItemFactory.createById("IRON_SWORD"));
-        player.equip(player.getInventory().get(0));
-        player.getInventory().add(ItemFactory.createById("HP_POTION_S"));
-        player.addGold(15);
-        player.takeDamage(3);
-        player.setPos(new Position(4, 3));
-
-        Floor floor = DungeonGenerator.createTestFloor();
-        Monster goblin = MonsterFactory.create(MonsterType.GOBLIN, new Position(1, 1));
-        goblin.getStats().setHp(5);
-        goblin.wakeUp();
-        floor.addMonster(goblin);
-        floor.addMonster(MonsterFactory.create(MonsterType.PILE_OF_BONES, new Position(2, 1), 7));
-        floor.addItem(FloorItem.gold(15, new Position(3, 1)));
-        floor.addItem(FloorItem.of(ItemFactory.createById("LEATHER_ARMOR"), new Position(4, 1)));
-
-        RunResult result = new RunResult();
-        result.reachFloor(2);
-        result.addKill();
-        GameContext run = new GameContext(player, floor, result);
-        run.nextTurn();
-        run.nextTurn();
-        run.nextTurn();
+        GameContext run = sampleRun();
+        Player player = run.getPlayer();
+        Floor floor = run.getFloor();
 
         SaveManager m = new SaveManager(root.resolve("saves"));
         m.save(1, SlotData.withRun(sampleProfile(), run));
@@ -302,7 +285,7 @@ public final class SaveManagerCheck {
         expect("[PLAYER] hp", p.getInt("PLAYER", "hp"), player.getStats().getHp());
         expect("[PLAYER] maxHp", p.getInt("PLAYER", "maxHp"), player.getStats().getMaxHp());
         expect("[PLAYER] attack 는 장비 뺀 값", p.getInt("PLAYER", "attack"), player.getBaseAttack());
-        expect("[PLAYER] 위치", List.of(p.getInt("PLAYER", "x"), p.getInt("PLAYER", "y")), List.of(4, 3));
+        expect("[PLAYER] 위치", new Position(p.getInt("PLAYER", "x"), p.getInt("PLAYER", "y")), player.getPos());
         expect("[PLAYER] weapon", p.getString("PLAYER", "weapon"), "IRON_SWORD");
         expect("[PLAYER] 방어구 없으면 빈 값", p.getString("PLAYER", "armor"), "");
         expect("[INVENTORY]", p.getList("INVENTORY", "item"), List.of("HP_POTION_S"));
@@ -324,6 +307,113 @@ public final class SaveManagerCheck {
         List<String> items = p.getList("ITEMS", "item");
         expect("[ITEMS] 골드", items.contains("GOLD:15,3,1"), true);
         expect("[ITEMS] 아이템", items.contains("LEATHER_ARMOR,4,1"), true);
+    }
+
+    private static void checkRunRoundTrip(Path root) {
+        SaveManager m = new SaveManager(root.resolve("saves"));
+        GameContext saved = sampleRun();
+        m.save(1, SlotData.withRun(sampleProfile(), saved));
+
+        SlotData loaded = m.load(1);
+        expect("불러온 슬롯에 탐험 있음", loaded.hasRun(), true);
+        expectSameProfile("탐험과 함께 저장한 프로필", loaded.profile(), sampleProfile());
+        GameContext run = loaded.run().orElseThrow();
+        Player p = run.getPlayer();
+        expect("복원: 이름·직업·레벨", List.of(p.getName(), p.getJob(), p.getLevel()), List.of("용사", Job.WARRIOR, 1));
+        expect("복원: HP", p.getStats().getHp(), saved.getPlayer().getStats().getHp());
+        expect("복원: 공격력은 철 검 포함", p.getAttack(), saved.getPlayer().getAttack());
+        expect("복원: 장착 무기는 가방에 없음", p.getInventory().size(), 1);
+        expect("복원: 위치", p.getPos(), saved.getPlayer().getPos());
+        expect("복원: 턴", run.getTurn(), 3);
+        expect("복원: 처치·도달 층", List.of(run.getRunResult().getKills(), run.getRunResult().getDeepestFloor()),
+                List.of(1, 2));
+        expect("복원: 몬스터 수", run.getFloor().getMonsters().size(), saved.getFloor().getMonsters().size());
+        expect("복원: 계단", run.getFloor().getStairs(), saved.getFloor().getStairs());
+        // 다시 저장한 내용이 처음 저장한 내용과 같으면 모든 값이 그대로 복원된 것이다 (저장 시각 제외)
+        expect("다시 저장해도 같은 내용", withoutSavedAt(SlotCodec.encode(loaded)),
+                withoutSavedAt(m.readLines(1)));
+
+        expect("탐험 요약", m.getSlotSummary(1), "파편 200 | 최고 3층 | 탐험 6회 | 진행 중: 용사 Lv.1 전사 지하 "
+                + saved.getFloor().getLevel() + "층");
+        m.clearRun(1, loaded.profile());
+        expect("clearRun 후 탐험 삭제", m.load(1).hasRun(), false);
+    }
+
+    private static void checkBrokenRun(Path root) {
+        SaveManager m = new SaveManager(root.resolve("saves"));
+        m.save(1, SlotData.withRun(sampleProfile(), sampleRun()));
+        List<String> valid = m.readLines(1);
+        String goblin = valid.stream().filter(l -> l.startsWith("monster=GOBLIN")).findFirst().orElseThrow();
+
+        expectBrokenRun(m, "모르는 몬스터", with(valid, goblin, goblin.replace("GOBLIN", "DRAGON")));
+        expectBrokenRun(m, "몬스터 HP 0", with(valid, goblin, "monster=GOBLIN,1,1,0,true"));
+        expectBrokenRun(m, "몬스터 칸 수", with(valid, goblin, "monster=GOBLIN,1,1,5"));
+        expectBrokenRun(m, "맵 밖 아이템", with(valid, "item=GOLD:15,3,1", "item=GOLD:15,99,1"));
+        expectBrokenRun(m, "모르는 아이템", with(valid, "item=HP_POTION_S", "item=MAGIC_RING"));
+        expectBrokenRun(m, "무기 칸에 물약", with(valid, "weapon=IRON_SWORD", "weapon=HP_POTION_S"));
+        expectBrokenRun(m, "경험치 초과", with(valid, "exp=0", "exp=" + Player.EXP_PER_LEVEL));
+        expectBrokenRun(m, "플레이어 HP 0", replaceKey(valid, "hp=", "hp=0"));
+        expectBrokenRun(m, "모르는 직업", with(valid, "job=WARRIOR", "job=KNIGHT"));
+        expectBrokenRun(m, "맵 줄 누락", valid.stream().filter(l -> !l.startsWith("map5=")).toList());
+        expectBrokenRun(m, "turn 없음", valid.stream().filter(l -> !l.startsWith("turn=")).toList());
+
+        m.writeLines(1, with(valid, goblin, goblin.replace("GOBLIN", "DRAGON")));
+        expect("탐험만 손상된 요약", m.getSlotSummary(1), "파편 200 | 최고 3층 | 탐험 6회 | 탐험 기록 손상");
+        m.writeLines(1, replaceKey(valid, "shards=", "shards=-1"));
+        SaveLoadException e = expectThrows("프로필이 손상되면 전체 손상", SaveLoadException.class, () -> m.load(1));
+        expect("프로필 손상은 CorruptedRunException 아님", e instanceof CorruptedRunException, false);
+    }
+
+    /** 가방 칸·경험치 배율은 세이브에 없어서 불러올 때 프로필로 다시 맞춘다. 강화가 두 번 붙으면 안 된다. */
+    private static void checkRunModifiers(Path root) {
+        SaveManager m = new SaveManager(root.resolve("saves"));
+        Profile profile = Profile.restore(0, 1, 1, 0, 0, EnumSet.of(Job.WARRIOR),
+                Map.of(UpgradeType.BAG_SIZE, 1, UpgradeType.EXP_BOOST, 1, UpgradeType.MAX_HP, 1));
+        GameContext run = sampleRun();
+        Player saved = run.getPlayer();
+        profile.applyRunModifiers(saved);
+        while (!saved.getInventory().isFull()) {
+            saved.getInventory().add(ItemFactory.createById("HP_POTION_S"));
+        }
+        m.save(1, SlotData.withRun(profile, run));
+
+        Player loaded = m.load(1).run().orElseThrow().getPlayer();
+        expect("큰 가방 칸 유지", loaded.getInventory().getCapacity(), Inventory.CAPACITY + 2);
+        expect("가득 찬 가방 그대로", loaded.getInventory().size(), saved.getInventory().size());
+        expect("최대 HP 강화는 다시 붙지 않음", loaded.getStats().getMaxHp(), saved.getStats().getMaxHp());
+        loaded.gainExp(10);
+        expect("배움의 축복 +10% 유지", loaded.getExp(), 11);
+    }
+
+    /**
+     * 저장해 볼 탐험: 철 검 장착, 물약 1개, 골드 15, HP -3, 시작 위치.
+     * 층에는 깨어난 고블린(HP 5), 탄생 턴 7 인 뼈 무더기, 골드 15, 가죽 갑옷. 3턴 진행, 2층 도달, 1처치.
+     */
+    private static GameContext sampleRun() {
+        Player player = new Player("용사", Job.WARRIOR);
+        player.getInventory().add(ItemFactory.createById("IRON_SWORD"));
+        player.equip(player.getInventory().get(0));
+        player.getInventory().add(ItemFactory.createById("HP_POTION_S"));
+        player.addGold(15);
+        player.takeDamage(3);
+        Floor floor = DungeonGenerator.createTestFloor();
+        player.setPos(floor.getStartPos());
+        Monster goblin = MonsterFactory.create(MonsterType.GOBLIN, new Position(1, 1));
+        goblin.getStats().setHp(5);
+        goblin.wakeUp();
+        floor.addMonster(goblin);
+        floor.addMonster(MonsterFactory.create(MonsterType.PILE_OF_BONES, new Position(2, 1), 7));
+        floor.addItem(FloorItem.gold(15, new Position(3, 1)));
+        floor.addItem(FloorItem.of(ItemFactory.createById("LEATHER_ARMOR"), new Position(4, 1)));
+
+        RunResult result = new RunResult();
+        result.reachFloor(2);
+        result.addKill();
+        GameContext run = new GameContext(player, floor, result);
+        run.nextTurn();
+        run.nextTurn();
+        run.nextTurn();
+        return run;
     }
 
     private static void checkRunResultRestore() {
@@ -364,6 +454,23 @@ public final class SaveManagerCheck {
     private static void expectBroken(SaveManager m, String name, List<String> lines) {
         m.writeLines(1, lines);
         expectThrows(name, SaveLoadException.class, () -> m.load(1));
+    }
+
+    private static void expectBrokenRun(SaveManager m, String name, List<String> lines) {
+        m.writeLines(1, lines);
+        CorruptedRunException e = expectThrows("탐험 손상: " + name, CorruptedRunException.class, () -> m.load(1));
+        if (e != null) {
+            expect("탐험 손상(" + name + ")에도 프로필 유지", e.getProfile().getShards(), 200);
+        }
+    }
+
+    /** key= 로 시작하는 첫 줄을 replacement 로 바꾼 사본. */
+    private static List<String> replaceKey(List<String> lines, String keyPrefix, String replacement) {
+        return with(lines, lines.stream().filter(l -> l.startsWith(keyPrefix)).findFirst().orElseThrow(), replacement);
+    }
+
+    private static List<String> withoutSavedAt(List<String> lines) {
+        return lines.stream().filter(l -> !l.startsWith("savedAt=")).toList();
     }
 
     /** lines 에서 target 줄 하나를 replacement 로 바꾼 사본. */

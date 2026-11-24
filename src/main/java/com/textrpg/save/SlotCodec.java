@@ -84,7 +84,8 @@ final class SlotCodec {
      * 파싱된 세이브 파일을 SlotData 로 바꾼다. [UPGRADES] 의 모르는 강화 id 는 무시한다 (Project-Plan 2.7).
      * [RUN] 섹션이 없으면 진행 중인 탐험이 없는 슬롯이다.
      *
-     * @throws SaveLoadException 버전이 다르거나, 필수 값이 없거나, 값이 잘못되었을 때
+     * @throws CorruptedRunException 프로필은 읽었지만 탐험 섹션이 잘못되었을 때
+     * @throws SaveLoadException     버전이 다르거나, 프로필의 필수 값이 없거나, 값이 잘못되었을 때
      */
     static SlotData decode(SaveFileParser parser) {
         int version = parser.getInt(META, "version");
@@ -95,7 +96,11 @@ final class SlotCodec {
         if (!parser.hasSection(RUN)) {
             return SlotData.profileOnly(profile);
         }
-        return SlotData.withRun(profile, readRun(parser));
+        try {
+            return SlotData.withRun(profile, readRun(parser, profile));
+        } catch (SaveLoadException e) {
+            throw new CorruptedRunException(profile, "진행 중인 탐험 기록이 손상되었습니다: " + e.getMessage(), e);
+        }
     }
 
     private static void writeProfile(SaveFileWriter w, Profile p) {
@@ -230,11 +235,14 @@ final class SlotCodec {
         }
     }
 
-    private static GameContext readRun(SaveFileParser parser) {
+    /** 진행 중인 탐험을 되살린다. 세이브에 없는 강화 효과(가방 칸·경험치 배율)는 프로필로 다시 맞춘다. */
+    private static GameContext readRun(SaveFileParser parser, Profile profile) {
         Floor floor = readFloor(parser);
         readMonsters(parser, floor);
         readItems(parser, floor);
-        Player player = readPlayer(parser);
+        Player player = readPlayer(parser, floor);
+        // applyTo 를 다시 부르면 HP·공격·방어 강화가 두 번 붙으므로 저장되지 않는 효과만 맞춘다
+        profile.applyRunModifiers(player);
 
         RunResult result;
         try {
@@ -251,11 +259,51 @@ final class SlotCodec {
         return run;
     }
 
-    private static Player readPlayer(SaveFileParser parser) {
-        // TODO(A, 2단계): Player 복원 메서드가 생기면 [PLAYER]·[INVENTORY] 값으로 플레이어를 되살린다.
-        //  쓰는 값: name, job, level, exp, gold, hp, maxHp, mp, maxMp, attack, defense, x, y, weapon, armor,
-        //  [INVENTORY] item (아이템은 readItem 으로 만든다). 위치는 checkInside 로 맵 안인지 확인한다.
-        throw new SaveLoadException("진행 중인 탐험 불러오기는 아직 준비 중입니다.");
+    private static Player readPlayer(SaveFileParser parser, Floor floor) {
+        String name = parser.getString(PLAYER, "name").strip();
+        if (name.isEmpty()) {
+            throw new SaveLoadException("[PLAYER] 이름이 비어 있습니다.");
+        }
+        String jobName = parser.getString(PLAYER, "job");
+        Job job;
+        try {
+            job = Job.valueOf(jobName.strip());
+        } catch (IllegalArgumentException e) {
+            throw new SaveLoadException("[PLAYER] 모르는 직업입니다: " + jobName, e);
+        }
+
+        int x = parser.getInt(PLAYER, "x");
+        int y = parser.getInt(PLAYER, "y");
+        Position pos = checkInside(floor, PLAYER, "x=" + x + ", y=" + y, x, y);
+        if (!floor.isWalkable(pos)) {
+            throw new SaveLoadException("[PLAYER] 지나갈 수 없는 칸에 있습니다: x=" + x + ", y=" + y);
+        }
+
+        List<Item> items = new ArrayList<>();
+        for (String id : parser.getList(INVENTORY, ITEM_KEY)) {
+            items.add(readItem(INVENTORY, id));
+        }
+        try {
+            return Player.restore(name, job,
+                    parser.getInt(PLAYER, "level"),
+                    parser.getInt(PLAYER, "exp"),
+                    parser.getInt(PLAYER, "gold"),
+                    parser.getInt(PLAYER, "hp"),
+                    parser.getInt(PLAYER, "maxHp"),
+                    parser.getInt(PLAYER, "mp"),
+                    parser.getInt(PLAYER, "maxMp"),
+                    parser.getInt(PLAYER, "attack"),
+                    parser.getInt(PLAYER, "defense"),
+                    pos, readEquipment(parser, "weapon"), readEquipment(parser, "armor"), items);
+        } catch (IllegalArgumentException e) {
+            throw new SaveLoadException("[PLAYER] 값이 잘못되었습니다: " + e.getMessage(), e);
+        }
+    }
+
+    /** 장비 칸(weapon/armor)의 아이템. 빈 값이면 장비 없음(null). 칸에 맞는 종류인지는 Player.restore 가 확인한다. */
+    private static Item readEquipment(SaveFileParser parser, String key) {
+        String id = parser.getString(PLAYER, key).strip();
+        return id.isEmpty() ? null : readItem(PLAYER, id);
     }
 
     private static Floor readFloor(SaveFileParser parser) {
