@@ -12,6 +12,7 @@ import com.textrpg.map.DungeonGenerator;
 import com.textrpg.map.Floor;
 import com.textrpg.meta.Profile;
 import com.textrpg.meta.RunResult;
+import com.textrpg.meta.ShardCalculator;
 import com.textrpg.meta.UpgradeType;
 import com.textrpg.save.SaveLoadException;
 import com.textrpg.save.SaveManager;
@@ -37,7 +38,7 @@ import com.textrpg.ui.InputHandler;
  */
 public class GameManager {
 
-    private static final String COMMAND_PROMPT = "명령 (w/a/s/d 이동, g 줍기, i 가방, > 내려가기, ? 도움말): ";
+    private static final String COMMAND_PROMPT = "명령 (w/a/s/d 이동, i 가방, l 로그, > 내려가기, ? 도움말): ";
     private static final String PRESS_ENTER = "Enter 를 누르면 돌아갑니다.";
     private static final int MAX_NAME_LENGTH = 12;
     /** 이름을 비워 두면 쓰는 기본 이름. */
@@ -244,7 +245,8 @@ public class GameManager {
 
     /**
      * 탐험 턴 루프: 화면 그리기 → 입력 → CommandParser.parse → 명령마다 처리.
-     * 화면 명령(INVENTORY, HELP, SAVE_QUIT)은 여기서 처리하고, 나머지는 turnSystem.playTurn() 에 넘긴다.
+     * 화면 명령(INVENTORY, HELP, LOG, SAVE_QUIT)은 여기서 처리하고, 나머지는 turnSystem.playTurn() 에 넘긴다.
+     * 탐험 화면에는 이번 행동으로 생긴 메시지만 보이도록, 턴을 쓰는 명령을 실행하기 전에 지난 메시지를 읽음 처리한다.
      * 연속 이동(dddd)은 명령마다 한 턴씩 진행하고, 중간에 몬스터가 나타나거나 턴을 못 쓰면 남은 명령을 버린다.
      *
      * @return DIED → DEAD, VICTORY → VICTORY, 저장 후 종료 → SLOT_MENU
@@ -261,13 +263,22 @@ public class GameManager {
                 }
                 continue;
             }
+            if (!isScreenCommand(commands.get(0).type())) {
+                run.getLog().markRead();
+            }
             next = runCommands(commands);
         }
         return next;
     }
 
+    /** 턴을 쓰지 않고 다른 화면을 여는 명령인지. 이 명령들은 CommandParser 가 한 줄에 하나만 만든다. */
+    private static boolean isScreenCommand(CommandType type) {
+        return type == CommandType.INVENTORY || type == CommandType.HELP
+                || type == CommandType.LOG || type == CommandType.SAVE_QUIT;
+    }
+
     /**
-     * 한 줄에서 나온 명령들을 차례로 실행한다. 화면 명령(INVENTORY, HELP, SAVE_QUIT)은 CommandParser 가
+     * 한 줄에서 나온 명령들을 차례로 실행한다. 화면 명령(INVENTORY, HELP, LOG, SAVE_QUIT)은 CommandParser 가
      * 한 줄에 하나만 만들므로 여기서 바로 처리한다. 연속 이동은 턴을 못 썼거나 중단 조건에 걸리면 남은 명령을 버린다.
      *
      * @return 탐험이 이어지면 PLAYING, 아니면 다음 상태 (DEAD, VICTORY, SLOT_MENU)
@@ -284,6 +295,12 @@ public class GameManager {
                 case HELP -> {
                     view.clearScreen();
                     view.printHelp();
+                    waitForEnter();
+                    return GameState.PLAYING;
+                }
+                case LOG -> {
+                    view.clearScreen();
+                    view.printLogHistory(run.getLog());
                     waitForEnter();
                     return GameState.PLAYING;
                 }
@@ -355,10 +372,18 @@ public class GameManager {
      * @return SLOT_MENU
      */
     private GameState endRun(boolean victory) {
-        // TODO(A): runResult.finish(player, victory, turnSystem.getDeathCause())
-        //  → shards = ShardCalculator.calculate → profile.recordRun → saveManager.clearRun(slot, profile)
-        //  → view.printRunResult(runResult, ShardCalculator.breakdown(...)) → run = null
-        throw new UnsupportedOperationException("GameManager.endRun 은 아직 구현되지 않았습니다.");
+        RunResult result = run.getRunResult();
+        result.finish(run.getPlayer(), victory, victory ? "" : turnSystem.getDeathCause());
+        int shards = ShardCalculator.calculate(result, profile);
+        profile.recordRun(result, shards);
+        // TODO(A): SaveManager 구현 후 saveManager.clearRun(slot, profile) — 반드시 화면 출력보다 먼저
+        run = null;
+
+        view.clearScreen();
+        // TODO(A, B): ShardCalculator.breakdown 구현 후 ShardCalculator.breakdown(result, profile) 로 교체 (마지막 줄에 합계 요청)
+        view.printRunResult(result, List.of("합계 " + shards));
+        waitForEnter();
+        return GameState.SLOT_MENU;
     }
 
     /** 슬롯 메뉴 항목. 선언 순서가 화면 순서다. */

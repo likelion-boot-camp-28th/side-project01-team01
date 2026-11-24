@@ -19,7 +19,7 @@ import com.textrpg.monster.Monster;
  * 탐험 중 한 턴을 처리한다: 플레이어 행동 → (턴을 썼으면) 몬스터 행동 → 턴 마무리.
  * 턴 순서를 이 클래스 한곳에서 정하므로 GameManager 는 playTurn() 결과만 보고 화면을 바꾼다.
  *
- * <p>가방 보기(INVENTORY), 도움말(HELP), 저장 후 종료(SAVE_QUIT)는 턴을 쓰지 않는 화면 명령이라
+ * <p>가방 보기(INVENTORY), 도움말(HELP), 로그 보기(LOG), 저장 후 종료(SAVE_QUIT)는 턴을 쓰지 않는 화면 명령이라
  * GameManager 가 직접 처리하고 이 클래스로 넘기지 않는다.
  *
  * <p>턴을 쓰지 못한 행동(NO_TURN)은 이유를 MessageLog 에 남긴다. 아무 반응이 없으면 입력이 무시된 것처럼 보이기 때문이다.
@@ -44,10 +44,10 @@ public class TurnSystem {
      *   <li>턴 마무리: ctx.nextTurn(), 자연 회복. 계단을 내려간 턴(DESCENDED)도 턴 수에 넣는다</li>
      * </ol>
      *
-     * @param cmd 실행할 명령. INVENTORY, HELP, SAVE_QUIT 는 받지 않는다
+     * @param cmd 실행할 명령. INVENTORY, HELP, LOG, SAVE_QUIT 는 받지 않는다
      * @param ctx 이번 탐험의 컨텍스트
      * @return 턴 결과. NO_TURN 이면 몬스터는 움직이지 않고 턴 수도 그대로다
-     * @throws IllegalArgumentException 화면 명령(INVENTORY, HELP, SAVE_QUIT)을 넘겼을 때
+     * @throws IllegalArgumentException 화면 명령(INVENTORY, HELP, LOG, SAVE_QUIT)을 넘겼을 때
      */
     public TurnOutcome playTurn(Command cmd, GameContext ctx) {
         deathCause = "";
@@ -82,13 +82,14 @@ public class TurnSystem {
             case DROP -> drop(cmd.itemIndex(), ctx);
             case DESCEND -> descend(ctx);
             case WAIT -> TurnOutcome.TURN_USED;
-            case INVENTORY, HELP, SAVE_QUIT -> throw new IllegalArgumentException(
+            case INVENTORY, HELP, LOG, SAVE_QUIT -> throw new IllegalArgumentException(
                     "턴을 쓰지 않는 화면 명령은 GameManager 가 처리합니다: " + cmd.type());
         };
     }
 
     /**
      * 한 칸 이동한다. 그 칸에 몬스터가 있으면 이동 대신 공격한다.
+     * 골드·아이템이 있는 칸에 들어가면 턴을 더 쓰지 않고 자동으로 줍는다 (가방이 가득 차면 안내만 하고 바닥에 남김).
      *
      * @return 벽이면 NO_TURN, 이동·공격이면 TURN_USED, 공격으로 보스를 쓰러뜨리면 VICTORY
      */
@@ -106,6 +107,10 @@ public class TurnSystem {
             return TurnOutcome.NO_TURN;
         }
         player.setPos(next);
+        FloorItem floorItem = floor.getItemAt(next);
+        if (floorItem != null) {
+            take(floorItem, ctx);
+        }
         return TurnOutcome.TURN_USED;
     }
 
@@ -126,33 +131,42 @@ public class TurnSystem {
     }
 
     /**
-     * 발밑의 골드나 아이템을 줍는다. 아이템은 가방에 넣은 뒤에 바닥에서 지운다 (가방이 가득 차면 바닥에 그대로 남음).
+     * 발밑의 골드나 아이템을 줍는다 (g). 밟으면 자동으로 줍기 때문에, 가방이 가득 차서 남겨 둔 아이템을 나중에 주울 때 쓴다.
      *
      * @return 주웠으면 TURN_USED, 발밑이 비었거나 가방이 가득 차면 NO_TURN
      */
     private TurnOutcome pickUp(GameContext ctx) {
+        FloorItem floorItem = ctx.getFloor().getItemAt(ctx.getPlayer().getPos());
+        if (floorItem == null) {
+            ctx.getLog().add("주울 것이 없습니다.");
+            return TurnOutcome.NO_TURN;
+        }
+        return take(floorItem, ctx) ? TurnOutcome.TURN_USED : TurnOutcome.NO_TURN;
+    }
+
+    /**
+     * 바닥의 골드나 아이템을 플레이어에게 옮긴다. 아이템은 가방에 넣은 뒤에 바닥에서 지운다 (가방이 가득 차면 바닥에 그대로 남음).
+     *
+     * @return 주웠으면 true, 가방이 가득 차서 못 주웠으면 false
+     */
+    private boolean take(FloorItem floorItem, GameContext ctx) {
         Player player = ctx.getPlayer();
         Floor floor = ctx.getFloor();
         MessageLog log = ctx.getLog();
 
-        FloorItem floorItem = floor.getItemAt(player.getPos());
-        if (floorItem == null) {
-            log.add("주울 것이 없습니다.");
-            return TurnOutcome.NO_TURN;
-        }
         if (floorItem.isGold()) {
             player.addGold(floorItem.goldAmount());
             floor.removeItem(floorItem);
             log.add(floorItem.goldAmount() + " 골드를 주웠습니다.");
-            return TurnOutcome.TURN_USED;
+            return true;
         }
         if (!player.getInventory().add(floorItem.item())) {
-            log.add("가방이 가득 찼습니다.");
-            return TurnOutcome.NO_TURN;
+            log.add("가방이 가득 차서 " + floorItem.item().getDisplayName() + "을(를) 줍지 못했습니다.");
+            return false;
         }
         floor.removeItem(floorItem);
         log.add(floorItem.item().getDisplayName() + "을(를) 주웠습니다.");
-        return TurnOutcome.TURN_USED;
+        return true;
     }
 
     /**

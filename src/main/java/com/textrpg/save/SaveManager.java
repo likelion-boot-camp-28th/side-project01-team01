@@ -10,6 +10,8 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
 
+import com.textrpg.meta.Profile;
+
 /**
  * 세이브 슬롯 파일(saves/slot1.sav ~ slot3.sav)을 읽고 쓴다.
  */
@@ -40,8 +42,30 @@ public class SaveManager {
         return Files.isRegularFile(slotFile(slot));
     }
 
-    // TODO(A, 2차): save(int slot, SlotData data), load(int slot), clearRun(int slot, Profile updated),
-    //  getSlotSummary(int slot) — SlotData 가 Profile(B), Player(B), Floor(D) 를 쓰므로 B·C·D 스켈레톤 이후에 추가
+    /**
+     * 슬롯에 저장한다. 임시 파일에 쓴 뒤 교체하므로 도중에 꺼져도 기존 세이브는 남는다.
+     *
+     * @throws SaveLoadException 쓰기에 실패했을 때
+     */
+    public void save(int slot, SlotData data) {
+        writeLines(slot, SlotCodec.encode(data));
+    }
+
+    /**
+     * 슬롯을 읽는다.
+     *
+     * @throws SaveLoadException 파일이 없거나 손상되었을 때
+     */
+    public SlotData load(int slot) {
+        return SlotCodec.decode(SaveFileParser.parse(readLines(slot)));
+    }
+
+    /** 사망·클리어 후 탐험 섹션을 지우고 갱신된 프로필만 저장한다 (영구 죽음). */
+    public void clearRun(int slot, Profile updated) {
+        save(slot, SlotData.profileOnly(updated));
+    }
+
+    // TODO(A): getSlotSummary(int slot) — 없으면 "(새 슬롯)", 손상이면 "(손상된 세이브)". 메뉴를 그릴 때 예외를 던지지 않는다
 
     /**
      * 슬롯 번호를 파일 경로로 바꾼다. 예: 1 → saves/slot1.sav
