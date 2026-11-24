@@ -11,6 +11,7 @@ import com.textrpg.entity.Player;
 import com.textrpg.item.FloorItem;
 import com.textrpg.item.Inventory;
 import com.textrpg.item.Item;
+import com.textrpg.item.ItemType;
 import com.textrpg.map.Floor;
 import com.textrpg.monster.Boss;
 import com.textrpg.monster.Monster;
@@ -171,8 +172,10 @@ public class TurnSystem {
 
     /**
      * 가방의 아이템을 사용하거나(USE) 장착한다(EQUIP). 결과 문장은 MessageLog 에 넣는다.
+     * 장착은 Player.equip 이 가방에서 새 장비를 빼고 원래 장비를 가방으로 돌려보낸다.
+     * 무기·방어구가 아닌 아이템은 상태가 바뀌지 않으므로 턴을 쓰지 않는다.
      *
-     * @return 번호가 가방 범위를 벗어나면 NO_TURN, 아니면 TURN_USED
+     * @return 번호가 가방 범위를 벗어나거나 장착할 수 없는 아이템이면 NO_TURN, 아니면 TURN_USED
      */
     private TurnOutcome useOrEquip(Command cmd, GameContext ctx) {
         Player player = ctx.getPlayer();
@@ -184,9 +187,13 @@ public class TurnSystem {
             ctx.getLog().add(player.useItem(index));
             return TurnOutcome.TURN_USED;
         }
-        // TODO(A, B와 합의): EQUIP — Player.equip 계약(가방에서 빼는 쪽, 장착 불가 아이템의 턴 소모) 확정 후 구현
-        ctx.getLog().add("아직 장착 기능을 쓸 수 없습니다.");
-        return TurnOutcome.NO_TURN;
+        Item item = player.getInventory().get(index);
+        if (item.getType() != ItemType.WEAPON && item.getType() != ItemType.ARMOR) {
+            ctx.getLog().add(item.getDisplayName() + "은(는) 장착할 수 없습니다.");
+            return TurnOutcome.NO_TURN;
+        }
+        ctx.getLog().add(player.equip(item));
+        return TurnOutcome.TURN_USED;
     }
 
     /**
