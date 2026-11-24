@@ -89,6 +89,7 @@ public class TurnSystem {
 
     /**
      * 한 칸 이동한다. 그 칸에 몬스터가 있으면 이동 대신 공격한다.
+     * 골드·아이템이 있는 칸에 들어가면 턴을 더 쓰지 않고 자동으로 줍는다 (가방이 가득 차면 안내만 하고 바닥에 남김).
      *
      * @return 벽이면 NO_TURN, 이동·공격이면 TURN_USED, 공격으로 보스를 쓰러뜨리면 VICTORY
      */
@@ -106,6 +107,10 @@ public class TurnSystem {
             return TurnOutcome.NO_TURN;
         }
         player.setPos(next);
+        FloorItem floorItem = floor.getItemAt(next);
+        if (floorItem != null) {
+            take(floorItem, ctx);
+        }
         return TurnOutcome.TURN_USED;
     }
 
@@ -126,33 +131,42 @@ public class TurnSystem {
     }
 
     /**
-     * 발밑의 골드나 아이템을 줍는다. 아이템은 가방에 넣은 뒤에 바닥에서 지운다 (가방이 가득 차면 바닥에 그대로 남음).
+     * 발밑의 골드나 아이템을 줍는다 (g). 밟으면 자동으로 줍기 때문에, 가방이 가득 차서 남겨 둔 아이템을 나중에 주울 때 쓴다.
      *
      * @return 주웠으면 TURN_USED, 발밑이 비었거나 가방이 가득 차면 NO_TURN
      */
     private TurnOutcome pickUp(GameContext ctx) {
+        FloorItem floorItem = ctx.getFloor().getItemAt(ctx.getPlayer().getPos());
+        if (floorItem == null) {
+            ctx.getLog().add("주울 것이 없습니다.");
+            return TurnOutcome.NO_TURN;
+        }
+        return take(floorItem, ctx) ? TurnOutcome.TURN_USED : TurnOutcome.NO_TURN;
+    }
+
+    /**
+     * 바닥의 골드나 아이템을 플레이어에게 옮긴다. 아이템은 가방에 넣은 뒤에 바닥에서 지운다 (가방이 가득 차면 바닥에 그대로 남음).
+     *
+     * @return 주웠으면 true, 가방이 가득 차서 못 주웠으면 false
+     */
+    private boolean take(FloorItem floorItem, GameContext ctx) {
         Player player = ctx.getPlayer();
         Floor floor = ctx.getFloor();
         MessageLog log = ctx.getLog();
 
-        FloorItem floorItem = floor.getItemAt(player.getPos());
-        if (floorItem == null) {
-            log.add("주울 것이 없습니다.");
-            return TurnOutcome.NO_TURN;
-        }
         if (floorItem.isGold()) {
             player.addGold(floorItem.goldAmount());
             floor.removeItem(floorItem);
             log.add(floorItem.goldAmount() + " 골드를 주웠습니다.");
-            return TurnOutcome.TURN_USED;
+            return true;
         }
         if (!player.getInventory().add(floorItem.item())) {
-            log.add("가방이 가득 찼습니다.");
-            return TurnOutcome.NO_TURN;
+            log.add("가방이 가득 차서 " + floorItem.item().getDisplayName() + "을(를) 줍지 못했습니다.");
+            return false;
         }
         floor.removeItem(floorItem);
         log.add(floorItem.item().getDisplayName() + "을(를) 주웠습니다.");
-        return TurnOutcome.TURN_USED;
+        return true;
     }
 
     /**
