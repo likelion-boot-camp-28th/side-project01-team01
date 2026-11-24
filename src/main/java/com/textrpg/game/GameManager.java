@@ -225,7 +225,7 @@ public class GameManager {
         String name = readPlayerName();
         Job job = chooseJob();
         Player player = new Player(name, job);
-        // TODO(A, B): Profile.applyTo 구현 후 profile.applyTo(player) 호출 (영구 강화 적용)
+        profile.applyTo(player);
 
         Floor first = DungeonGenerator.generate(1);
         player.setPos(first.getStartPos());
@@ -404,8 +404,7 @@ public class GameManager {
         run = null;
 
         view.clearScreen();
-        // TODO(A, B): ShardCalculator.breakdown 구현 후 ShardCalculator.breakdown(result, profile) 로 교체 (마지막 줄에 합계 요청)
-        view.printRunResult(result, List.of("합계 " + shards));
+        view.printRunResult(result, ShardCalculator.breakdown(result, profile));
         waitForEnter();
         return GameState.SLOT_MENU;
     }
