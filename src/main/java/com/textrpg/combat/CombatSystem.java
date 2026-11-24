@@ -50,7 +50,8 @@ public class CombatSystem {
 
     /**
      * 처치한 몬스터의 경험치·골드를 플레이어에게 주고, 몬스터를 맵에서 제거한다.
-     * 단, 처치된 몬스터가 해골 병사(SKELETON)인 경우 해골 병사가 제거된 자리에 뼈 무더기(PILE_OF_BONES)가 생성된다.
+     * 단, 처치한 몬스터가 해골 병사(SKELETON)인 경우 해골 병사가 제거된 자리에 뼈 무더기(PILE_OF_BONES)가 생성된다.
+     * 추가적으로 처치한 몬스터가 해골 병사 혹은 보스일 경우 처치 보상이 없어 보상 로그를 남기지 않는다.
      * ctx.getRunResult().addKill()로 처치 수를 기록한다. (해골 병사는 제외)
      *
      * @param monster 처치한 몬스터
@@ -71,6 +72,8 @@ public class CombatSystem {
         if (monster.getType() == MonsterType.SKELETON) {
             ctx.getFloor().addMonster(MonsterFactory.createBones(monster.getPos(), ctx.getTurn()));
             ctx.getLog().add("해골 병사가 사망하여 뼈 무더기가 되었습니다. 얼마 후에 해골 병사로 부활합니다. 그전에 처치하세요.");
+        } else if (monster.getType() == MonsterType.ABYSS_WARDEN) {
+            return;
         } else {
             ctx.getLog().add("처치 보상이 정산됩니다. +" + exp + "exp +" + gold + "gold");
         }
