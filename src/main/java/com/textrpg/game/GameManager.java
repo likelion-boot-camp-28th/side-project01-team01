@@ -404,8 +404,7 @@ public class GameManager {
         run = null;
 
         view.clearScreen();
-        // TODO(A, B): ShardCalculator.breakdown 구현 후 ShardCalculator.breakdown(result, profile) 로 교체 (마지막 줄에 합계 요청)
-        view.printRunResult(result, List.of("합계 " + shards));
+        view.printRunResult(result, ShardCalculator.breakdown(result, profile));
         waitForEnter();
         return GameState.SLOT_MENU;
     }
