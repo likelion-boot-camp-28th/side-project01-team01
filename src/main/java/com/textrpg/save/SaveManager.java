@@ -69,7 +69,7 @@ public class SaveManager {
      * 메인 메뉴에 보여 줄 슬롯 한 줄 요약. 메뉴는 항상 그려져야 하므로 예외를 던지지 않는다.
      * 예: "파편 85 | 최고 3층 | 탐험 6회 | 진행 중: 용사 Lv.3 전사 지하 2층"
      *
-     * @return 파일이 없으면 "(새 슬롯)", 읽을 수 없으면 "(손상된 세이브)"
+     * @return 파일이 없으면 "(새 슬롯)", 읽을 수 없으면 "(손상된 세이브)", 탐험만 손상되었으면 프로필 요약 뒤에 " | 탐험 기록 손상"
      * @throws IllegalArgumentException 슬롯 번호가 범위를 벗어날 때
      */
     public String getSlotSummary(int slot) {
@@ -79,16 +79,21 @@ public class SaveManager {
         SlotData data;
         try {
             data = load(slot);
+        } catch (CorruptedRunException e) {
+            return profileSummary(e.getProfile()) + " | 탐험 기록 손상";
         } catch (SaveLoadException e) {
             return "(손상된 세이브)";
         }
-        Profile p = data.profile();
-        String bestFloor = p.getBestFloor() == 0 ? "-" : p.getBestFloor() + "층";
-        String summary = "파편 " + p.getShards() + " | 최고 " + bestFloor + " | 탐험 " + p.getTotalRuns() + "회";
+        String summary = profileSummary(data.profile());
         return data.run()
                 .map(run -> summary + " | 진행 중: " + run.getPlayer().getName() + " Lv." + run.getPlayer().getLevel()
                         + " " + run.getPlayer().getJob().getDisplayName() + " 지하 " + run.getFloor().getLevel() + "층")
                 .orElse(summary);
+    }
+
+    private static String profileSummary(Profile p) {
+        String bestFloor = p.getBestFloor() == 0 ? "-" : p.getBestFloor() + "층";
+        return "파편 " + p.getShards() + " | 최고 " + bestFloor + " | 탐험 " + p.getTotalRuns() + "회";
     }
 
     /**
