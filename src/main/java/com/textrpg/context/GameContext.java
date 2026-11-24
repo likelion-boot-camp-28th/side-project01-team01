@@ -21,7 +21,7 @@ public class GameContext {
     private final MessageLog log = new MessageLog();
     /** 계단을 내려가면 바뀐다. */
     private Floor floor;
-    /** 지금까지 지난 턴 수. 행동해서 턴을 쓴 경우에만 늘어난다. */
+    /** 지금까지 지난 턴 수. 행동해서 턴을 쓴 경우에만 늘어난다. 바뀔 때마다 log 에도 알려 메시지에 턴을 붙인다. */
     private int turn;
 
     /**
@@ -72,7 +72,9 @@ public class GameContext {
      * @return 늘어난 뒤의 턴 수
      */
     public int nextTurn() {
-        return ++turn;
+        turn++;
+        log.setTurn(turn);
+        return turn;
     }
 
     /**
@@ -86,5 +88,6 @@ public class GameContext {
             throw new IllegalArgumentException("턴 수는 0 이상입니다: " + turn);
         }
         this.turn = turn;
+        log.setTurn(turn);
     }
 }

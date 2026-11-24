@@ -19,7 +19,7 @@ import com.textrpg.monster.Monster;
  * 탐험 중 한 턴을 처리한다: 플레이어 행동 → (턴을 썼으면) 몬스터 행동 → 턴 마무리.
  * 턴 순서를 이 클래스 한곳에서 정하므로 GameManager 는 playTurn() 결과만 보고 화면을 바꾼다.
  *
- * <p>가방 보기(INVENTORY), 도움말(HELP), 저장 후 종료(SAVE_QUIT)는 턴을 쓰지 않는 화면 명령이라
+ * <p>가방 보기(INVENTORY), 도움말(HELP), 로그 보기(LOG), 저장 후 종료(SAVE_QUIT)는 턴을 쓰지 않는 화면 명령이라
  * GameManager 가 직접 처리하고 이 클래스로 넘기지 않는다.
  *
  * <p>턴을 쓰지 못한 행동(NO_TURN)은 이유를 MessageLog 에 남긴다. 아무 반응이 없으면 입력이 무시된 것처럼 보이기 때문이다.
@@ -44,10 +44,10 @@ public class TurnSystem {
      *   <li>턴 마무리: ctx.nextTurn(), 자연 회복. 계단을 내려간 턴(DESCENDED)도 턴 수에 넣는다</li>
      * </ol>
      *
-     * @param cmd 실행할 명령. INVENTORY, HELP, SAVE_QUIT 는 받지 않는다
+     * @param cmd 실행할 명령. INVENTORY, HELP, LOG, SAVE_QUIT 는 받지 않는다
      * @param ctx 이번 탐험의 컨텍스트
      * @return 턴 결과. NO_TURN 이면 몬스터는 움직이지 않고 턴 수도 그대로다
-     * @throws IllegalArgumentException 화면 명령(INVENTORY, HELP, SAVE_QUIT)을 넘겼을 때
+     * @throws IllegalArgumentException 화면 명령(INVENTORY, HELP, LOG, SAVE_QUIT)을 넘겼을 때
      */
     public TurnOutcome playTurn(Command cmd, GameContext ctx) {
         deathCause = "";
@@ -82,7 +82,7 @@ public class TurnSystem {
             case DROP -> drop(cmd.itemIndex(), ctx);
             case DESCEND -> descend(ctx);
             case WAIT -> TurnOutcome.TURN_USED;
-            case INVENTORY, HELP, SAVE_QUIT -> throw new IllegalArgumentException(
+            case INVENTORY, HELP, LOG, SAVE_QUIT -> throw new IllegalArgumentException(
                     "턴을 쓰지 않는 화면 명령은 GameManager 가 처리합니다: " + cmd.type());
         };
     }

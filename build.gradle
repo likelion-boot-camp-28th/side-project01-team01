@@ -28,6 +28,7 @@ application {
 // JUnit 을 쓰지 않으므로 기본 test 태스크는 끄고, src/test/java 의 확인용 main 클래스를 실행한다 (Team_Rules 2.11).
 // 확인용 클래스를 새로 만들면 아래 목록에 추가한다. 하나라도 실패(종료 코드 1)하면 build 가 실패한다.
 def checkClasses = [
+        'com.textrpg.core.MessageLogCheck',
         'com.textrpg.game.CommandParserCheck',
         'com.textrpg.save.SaveFileParserCheck',
         'com.textrpg.save.SaveFileWriterCheck',

@@ -12,7 +12,7 @@ import com.textrpg.core.Direction;
  * <p>입력 규칙 (11/20 회의 후 확정):
  * <ul>
  *   <li>{@code w/a/s/d}: 이동. {@code ddd} 처럼 이어 쓰면 순서대로 여러 번 (P1 연속 이동)</li>
- *   <li>{@code g} 줍기, {@code i} 가방, {@code >} 내려가기, {@code save} 저장 후 종료, {@code ?} 도움말</li>
+ *   <li>{@code g} 줍기, {@code i} 가방, {@code l} 지난 로그, {@code >} 내려가기, {@code save} 저장 후 종료, {@code ?} 도움말</li>
  *   <li>(제안) {@code u 3} 사용, {@code e 2} 장착, {@code x 1} 버리기, {@code .} 대기. 번호는 화면 기준 1부터</li>
  * </ul>
  */
@@ -50,7 +50,7 @@ public final class CommandParser {
         return command.map(List::of).orElseGet(() -> parseMoves(input));
     }
 
-    /** g, i, >, ?, . 처럼 한 글자로 끝나는 명령. */
+    /** g, i, l, >, ?, . 처럼 한 글자로 끝나는 명령. */
     private static Optional<Command> parseSingleKey(String input) {
         if (input.length() != 1) {
             return Optional.empty();
@@ -58,6 +58,7 @@ public final class CommandParser {
         CommandType type = switch (Character.toLowerCase(input.charAt(0))) {
             case 'g' -> CommandType.PICK_UP;
             case 'i' -> CommandType.INVENTORY;
+            case 'l' -> CommandType.LOG;
             case '>' -> CommandType.DESCEND;
             case '?' -> CommandType.HELP;
             case '.' -> CommandType.WAIT;

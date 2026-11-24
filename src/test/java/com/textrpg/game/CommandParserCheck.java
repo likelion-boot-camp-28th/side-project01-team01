@@ -61,6 +61,8 @@ public final class CommandParserCheck {
         expect("SAVE", List.of(Command.of(CommandType.SAVE_QUIT)));
         expect("  Save  ", List.of(Command.of(CommandType.SAVE_QUIT)));
         expect("?", List.of(Command.of(CommandType.HELP)));
+        expect("l", List.of(Command.of(CommandType.LOG)));
+        expect("L", List.of(Command.of(CommandType.LOG)));
         expect(".", List.of(Command.of(CommandType.WAIT)));
     }
 

@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+import com.textrpg.core.MessageLog;
 import com.textrpg.core.Position;
 import com.textrpg.entity.Job;
 import com.textrpg.entity.Player;
@@ -17,7 +18,7 @@ import com.textrpg.monster.MonsterFactory;
 import com.textrpg.monster.MonsterType;
 
 /**
- * MapRenderer 와 ConsoleView 의 문자열 생성(formatHeader, formatStatusBar, 결과 화면) 확인용.
+ * MapRenderer 와 ConsoleView 의 문자열 생성(formatHeader, formatStatusBar, 결과 화면, 메시지 줄바꿈) 확인용.
  * JUnit 대신 main 으로 실행한다 (Team_Rules 2.11). 실패가 하나라도 있으면 종료 코드 1.
  */
 public final class MapRendererCheck {
@@ -37,6 +38,7 @@ public final class MapRendererCheck {
         checkStatusBar();
         checkHeader();
         checkRunResult();
+        checkMessages();
 
         System.out.println("통과 " + passed + " / 실패 " + failed);
         if (failed > 0) {
@@ -158,6 +160,37 @@ public final class MapRendererCheck {
         RunResult cleared = new RunResult();
         cleared.finish(player, true, "");
         expect("클리어 제목", ConsoleView.formatResultTitle(cleared), "클리어 - 어둠의 파수꾼을 쓰러뜨렸습니다!");
+    }
+
+    private static void checkMessages() {
+        expect("한글 너비", ConsoleView.displayWidth("가a"), 3);
+        expect("턴 표시", ConsoleView.formatMessage(new MessageLog.Entry(4, "고블린을 쓰러뜨렸습니다.")),
+                List.of("> [5턴] 고블린을 쓰러뜨렸습니다."));
+
+        String longText = "해골 병사가 사망하여 뼈 무더기가 되었습니다. 얼마 후에 해골 병사로 부활합니다. 그전에 처치하세요.";
+        List<String> wrapped = ConsoleView.formatMessage(new MessageLog.Entry(9, longText));
+        expect("긴 메시지는 여러 줄", wrapped.size() > 1, true);
+        expectWithinWidth("긴 메시지", wrapped);
+        expect("다음 줄은 내용 위치에 맞춰 들여쓰기", wrapped.get(1).startsWith("         "), true);
+        expect("내용은 잘리지 않음", String.join(" ", wrapped).replaceAll("\\s+", " ").contains("그전에 처치하세요."), true);
+
+        String noSpace = "가".repeat(40);
+        expectWithinWidth("띄어쓰기 없는 긴 메시지", ConsoleView.formatMessage(new MessageLog.Entry(0, noSpace)));
+
+        List<MessageLog.Entry> many = new ArrayList<>();
+        for (int i = 0; i < 8; i++) {
+            many.add(new MessageLog.Entry(1, "m" + i));
+        }
+        List<String> lines = ConsoleView.formatNewMessages(many);
+        expect("넘치면 생략 안내", lines.get(0).contains("3개 생략"), true);
+        expect("최근 것만 표시", lines.get(lines.size() - 1), "> [2턴] m7");
+        expect("새 메시지가 없으면 빈 줄 없음", ConsoleView.formatNewMessages(List.of()), List.of());
+    }
+
+    private static void expectWithinWidth(String name, List<String> lines) {
+        for (String line : lines) {
+            expect(name + " 너비 60 이하: " + line, ConsoleView.displayWidth(line) <= ConsoleView.SCREEN_WIDTH, true);
+        }
     }
 
     private static Player playerAtStart(Floor floor) {
