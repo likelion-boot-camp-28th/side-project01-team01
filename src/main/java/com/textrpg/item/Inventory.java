@@ -50,6 +50,15 @@ public class Inventory {
         capacity += Math.max(0, extra);
     }
 
+    /**
+     * 가방 칸을 기본 CAPACITY + extra 로 맞춘다 (큰 가방 강화, P1).
+     * 더하는 게 아니라 맞추는 것이라 여러 번 불러도 결과가 같다 (새 탐험·이어하기 모두 안전).
+     * 이미 들어 있는 아이템보다 작게는 줄이지 않는다.
+     */
+    public void setExtraCapacity(int extra) {
+        capacity = Math.max(CAPACITY + Math.max(0, extra), items.size());
+    }
+
     /** 바깥에서 고칠 수 없는 복사본을 돌려준다. */
     public List<Item> getItems() {
         return List.copyOf(items);

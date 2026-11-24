@@ -141,7 +141,20 @@ public class Profile {
         int potionCount = getLevel(UpgradeType.START_POTION) * UpgradeType.START_POTION.getValuePerLevel();
         p.giveStartPotions(potionCount);
 
-        // TODO(B): BAG_SIZE → 가방 칸 증가(P1), EXP_BOOST → p.setExpMultiplier(P1)
+        applyRunModifiers(p);
+    }
+
+    /**
+     * 저장되지 않는 탐험용 강화 효과를 Player 에 맞춘다: 큰 가방(BAG_SIZE) 칸 수, 배움의 축복(EXP_BOOST) 경험치 배율.
+     * applyTo() 가 새 탐험 때 부르고, 이어하기로 Player.restore() 한 뒤에도 불러야 한다.
+     * 더하는 게 아니라 맞추는 것이라 여러 번 불러도 결과가 같다.
+     */
+    public void applyRunModifiers(Player p) {
+        int extraSlots = getLevel(UpgradeType.BAG_SIZE) * UpgradeType.BAG_SIZE.getValuePerLevel();
+        p.getInventory().setExtraCapacity(extraSlots);
+
+        int expPercent = getLevel(UpgradeType.EXP_BOOST) * UpgradeType.EXP_BOOST.getValuePerLevel();
+        p.setExpMultiplier(1.0 + expPercent / 100.0);
     }
 
     /**

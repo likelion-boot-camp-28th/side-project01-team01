@@ -44,6 +44,8 @@ public final class PlayerSkeletonCheck {
         checkUseItem();
         checkEquip();
         checkStartPotionAndMpPotion();
+        checkRestore();
+        checkRunModifiers();
 
         System.out.println("통과 " + passed + " / 실패 " + failed);
         if (failed > 0) {
@@ -416,6 +418,76 @@ public final class PlayerSkeletonCheck {
         check("마나 물약: MP 0 -> 5", mage.getStats().getMp() == 5);
         check("마나 물약 문장에 MP 5", message.contains("MP 를 5"));
         check("마신 마나 물약은 가방에서 사라짐", mage.getInventory().size() == 0);
+    }
+
+
+    private static void checkRestore() {
+        Item sword = ItemFactory.createById("IRON_SWORD");
+        Item armor = ItemFactory.createById("LEATHER_ARMOR");
+        java.util.List<Item> bag = java.util.List.of(
+                ItemFactory.createById("HP_POTION_S"), ItemFactory.createById("MP_POTION_S"));
+        Player p = Player.restore("용사", Job.WARRIOR, 3, 15, 42, 20, 45, 4, 9, 7, 5,
+                new Position(10, 5), sword, armor, bag);
+        check("복원: 이름·직업·레벨·경험치·골드", p.getName().equals("용사") && p.getJob() == Job.WARRIOR
+                && p.getLevel() == 3 && p.getExp() == 15 && p.getGold() == 42);
+        check("복원: HP 20/45, MP 4/9", p.getStats().getHp() == 20 && p.getStats().getMaxHp() == 45
+                && p.getStats().getMp() == 4 && p.getStats().getMaxMp() == 9);
+        check("복원: 기본 공격 7·방어 5", p.getBaseAttack() == 7 && p.getBaseDefense() == 5);
+        check("복원: 장비 보너스 더해짐 (공격 7+3, 방어 5+2)", p.getAttack() == 10 && p.getDefense() == 7);
+        check("복원: 위치 (10,5)", p.getPos().equals(new Position(10, 5)));
+        check("복원: 가방 2개 순서 그대로", p.getInventory().size() == 2
+                && p.getInventory().get(0).getId().equals("HP_POTION_S")
+                && p.getInventory().get(1).getId().equals("MP_POTION_S"));
+
+        Player bare = Player.restore("맨손", Job.MAGE, 1, 0, 0, 22, 22, 20, 20, 4, 1,
+                new Position(1, 1), null, null, java.util.List.of());
+        check("복원: 장비 없으면 맨손", bare.getWeapon().isEmpty() && bare.getArmor().isEmpty());
+
+        java.util.List<Item> big = new java.util.ArrayList<>();
+        for (int i = 0; i < Inventory.CAPACITY + 2; i++) {
+            big.add(ItemFactory.createById("HP_POTION_S"));
+        }
+        Player loaded = Player.restore("큰가방", Job.WARRIOR, 1, 0, 0, 30, 30, 5, 5, 5, 3,
+                new Position(1, 1), null, null, big);
+        check("복원: 큰 가방(14개)도 전부 들어감", loaded.getInventory().size() == Inventory.CAPACITY + 2);
+
+        check("복원 거절: 무기 칸에 물약", throwsIllegal(() -> Player.restore("x", Job.WARRIOR, 1, 0, 0, 30, 30, 5, 5, 5, 3,
+                new Position(1, 1), ItemFactory.createById("HP_POTION_S"), null, java.util.List.of())));
+        check("복원 거절: hp 가 maxHp 보다 큼", throwsIllegal(() -> Player.restore("x", Job.WARRIOR, 1, 0, 0, 31, 30, 5, 5, 5, 3,
+                new Position(1, 1), null, null, java.util.List.of())));
+        check("복원 거절: 레벨 1 인데 exp 20 (레벨업 했어야 함)", throwsIllegal(() -> Player.restore("x", Job.WARRIOR, 1, 20, 0, 30, 30, 5, 5, 5, 3,
+                new Position(1, 1), null, null, java.util.List.of())));
+    }
+
+    private static void checkRunModifiers() {
+        Profile profile = Profile.newProfile();
+        profile.recordRun(new RunResult(), 40 + 35);
+        profile.buy(UpgradeType.BAG_SIZE);
+        profile.buy(UpgradeType.EXP_BOOST);
+        Player p = new Player("용사", Job.WARRIOR);
+        profile.applyTo(p);
+        check("큰 가방 1단계 -> 가방 12 + 2 = 14칸", p.getInventory().getCapacity() == Inventory.CAPACITY + 2);
+        p.gainExp(10);
+        check("배움의 축복 1단계 -> 경험치 10 이 11 로", p.getExp() == 11);
+
+        profile.applyRunModifiers(p);
+        profile.applyRunModifiers(p);
+        check("여러 번 불러도 14칸 그대로 (이어하기 안전)", p.getInventory().getCapacity() == Inventory.CAPACITY + 2);
+
+        Player plain = new Player("용사", Job.WARRIOR);
+        Profile.newProfile().applyTo(plain);
+        check("강화 없으면 12칸, 배율 1.0", plain.getInventory().getCapacity() == Inventory.CAPACITY);
+        plain.gainExp(10);
+        check("강화 없으면 경험치 그대로 10", plain.getExp() == 10);
+    }
+
+    private static boolean throwsIllegal(Runnable action) {
+        try {
+            action.run();
+            return false;
+        } catch (IllegalArgumentException e) {
+            return true;
+        }
     }
 
 
