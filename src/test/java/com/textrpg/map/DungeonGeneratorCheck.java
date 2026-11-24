@@ -6,6 +6,7 @@ import com.textrpg.monster.Boss;
 import com.textrpg.monster.Monster;
 import com.textrpg.util.RandomUtil;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -42,9 +43,10 @@ public final class DungeonGeneratorCheck {
                 checkRooms(f, where);
                 checkGoal(f, level, where);
                 checkEntities(f, where);
+                checkSaveRoundTrip(f, level, where);
             }
         }
-        // TODO(D): 세이브 구현 후 exportTiles / exportSeen / exportRooms → fromSave 왕복 결과가 원본과 같은지 확인
+        checkInvalidSave();
 
         System.out.println("통과 " + passed + " / 실패 " + failed);
         if (failed > 0) {
@@ -176,6 +178,78 @@ public final class DungeonGeneratorCheck {
             for (FloorItem item : items) {
                 check(!startRoom.contains(item.pos()), where, "시작 방에 아이템 있음: " + item.pos());
             }
+        }
+    }
+
+    /**
+     * 세이브 왕복: export 세 개 → fromSave 로 복원한 층이 원본과 같은지.
+     * 몬스터·바닥 아이템은 SaveManager 가 따로 복원하므로 비교하지 않는다.
+     * 시작 위치는 원본(첫 방 안 무작위 칸)이 아니라 첫 방의 중심으로 복원되는 것이 규칙이다.
+     */
+    private static void checkSaveRoundTrip(Floor f, int level, String where) {
+        Floor restored;
+        try {
+            restored = Floor.fromSave(level, f.exportTiles(), f.exportSeen(), f.exportRooms());
+        } catch (IllegalArgumentException e) {
+            check(false, where, "정상 세이브를 복원하지 못함: " + e.getMessage());
+            return;
+        }
+        check(restored.getLevel() == level, where, "복원한 층 번호가 다름: " + restored.getLevel());
+        check(restored.exportTiles().equals(f.exportTiles()), where, "복원한 타일이 원본과 다름");
+        check(restored.exportSeen().equals(f.exportSeen()), where, "복원한 seen 이 원본과 다름");
+        check(restored.exportRooms().equals(f.exportRooms()), where, "복원한 방 목록(순서 포함)이 원본과 다름");
+        check(restored.getStairs().equals(f.getStairs()), where,
+                "복원한 계단 위치가 다름: " + restored.getStairs() + ", 원본 " + f.getStairs());
+        Position firstCenter = f.getRooms().get(0).center();
+        check(firstCenter.equals(restored.getStartPos()), where,
+                "복원한 시작 위치가 첫 방 중심이 아님: " + restored.getStartPos());
+    }
+
+    /**
+     * 잘못된 세이브는 IllegalArgumentException 으로 거부하는지. 정상 층 하나를 export 한 뒤 경우마다 한 군데만 망가뜨린다.
+     */
+    private static void checkInvalidSave() {
+        RandomUtil.setSeed(0);
+        Floor f = DungeonGenerator.generate(1);
+        List<String> tiles = f.exportTiles();
+        List<String> seen = f.exportSeen();
+        List<String> rooms = f.exportRooms();
+
+        List<String> missingLine = new ArrayList<>(tiles);
+        missingLine.remove(missingLine.size() - 1);
+        expectInvalid("타일 줄 수 부족", missingLine, seen, rooms);
+
+        List<String> shortLine = new ArrayList<>(tiles);
+        shortLine.set(0, shortLine.get(0).substring(1));
+        expectInvalid("타일 줄 길이 부족", shortLine, seen, rooms);
+
+        List<String> unknownTile = new ArrayList<>(tiles);
+        unknownTile.set(2, "X" + unknownTile.get(2).substring(1));
+        expectInvalid("모르는 타일 문자", unknownTile, seen, rooms);
+
+        List<String> seenMissingLine = new ArrayList<>(seen);
+        seenMissingLine.remove(0);
+        expectInvalid("seen 줄 수 부족", tiles, seenMissingLine, rooms);
+
+        List<String> badSeen = new ArrayList<>(seen);
+        badSeen.set(4, "x" + badSeen.get(4).substring(1));
+        expectInvalid("seen 에 '1'/'0' 아닌 문자", tiles, badSeen, rooms);
+
+        expectInvalid("방 없음", tiles, seen, List.of());
+        expectInvalid("방 숫자 개수 틀림", tiles, seen, List.of("1,2,3"));
+        expectInvalid("방 숫자가 아님", tiles, seen, List.of("1,2,a,4"));
+    }
+
+    /**
+     * fromSave 가 IllegalArgumentException 을 던지면 통과, 그대로 복원되면 실패.
+     */
+    private static void expectInvalid(String name, List<String> tiles, List<String> seen, List<String> rooms) {
+        String where = "잘못된 세이브(" + name + ")";
+        try {
+            Floor.fromSave(1, tiles, seen, rooms);
+            check(false, where, "예외 없이 복원됨");
+        } catch (IllegalArgumentException e) {
+            check(true, where, "");
         }
     }
 

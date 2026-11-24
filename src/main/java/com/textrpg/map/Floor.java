@@ -60,8 +60,72 @@ public class Floor {
      *                                  메시지에 몇 번째 줄이 왜 틀렸는지 넣는다 (SaveManager 가 SaveLoadException 으로 감싼다)
      */
     public static Floor fromSave(int level, List<String> tiles, List<String> seen, List<String> rooms) {
-        // TODO(D): 줄 수·길이 검사 → Tile.fromSaveChar 로 타일 복원 → seen 복원 → Room.fromSaveString → 계단 찾기
-        throw new UnsupportedOperationException("Floor.fromSave 는 아직 구현되지 않았습니다.");
+        Floor f = new Floor(level);
+
+        if (tiles.size() != HEIGHT) {
+            throw new IllegalArgumentException("타일 줄 수가 " + HEIGHT + "이 아님: " + tiles.size());
+        }
+        for (int y = 0; y < HEIGHT; y++) {
+            if (tiles.get(y).length() != WIDTH) {
+                throw new IllegalArgumentException(
+                        "타일 " + (y + 1) + "번째 줄 길이가 " + WIDTH + "이 아님: " + tiles.get(y).length());
+            }
+        }
+
+        if (seen.size() != HEIGHT) {
+            throw new IllegalArgumentException("seen 줄 수가 " + HEIGHT + "이 아님: " + seen.size());
+        }
+        for (int y = 0; y < HEIGHT; y++) {
+            if (seen.get(y).length() != WIDTH) {
+                throw new IllegalArgumentException(
+                        "seen " + (y + 1) + "번째 줄 길이가 " + WIDTH + "이 아님: " + seen.get(y).length());
+            }
+        }
+
+        for (int y = 0; y < HEIGHT; y++) {
+            for (int x = 0; x < WIDTH; x++) {
+                char c = tiles.get(y).charAt(x);
+                Tile t;
+                try {
+                    t = Tile.fromSaveChar(c);
+                } catch (IllegalArgumentException e) {
+                    throw new IllegalArgumentException(
+                            "타일 " + (y + 1) + "번째 줄에 알 수 없는 문자: '" + c + "'", e);
+                }
+                f.setTile(x, y, t);
+                if (t == Tile.STAIRS_DOWN) {
+                    f.setStairs(new Position(x, y));
+                }
+            }
+        }
+
+        for (int y = 0; y < HEIGHT; y++) {
+            for (int x = 0; x < WIDTH; x++) {
+                char c = seen.get(y).charAt(x);
+                if (c == '1') {
+                    f.seen[y][x] = true;
+                } else if (c == '0') {
+                    f.seen[y][x] = false;
+                } else {
+                    throw new IllegalArgumentException(
+                            "seen " + (y + 1) + "번째 줄에 잘못된 문자: '" + c + "' ('1' 또는 '0' 이어야 함)");
+                }
+            }
+        }
+
+        if (rooms.isEmpty()) {
+            throw new IllegalArgumentException("방이 하나도 없음");
+        }
+        for (int i = 0; i < rooms.size(); i++) {
+            String s = rooms.get(i);
+            try {
+                f.addRoom(Room.fromSaveString(s));
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("방 " + (i + 1) + "번째 줄 형식이 잘못됨: " + s, e);
+            }
+        }
+        f.setStartPos(f.rooms.get(0).center());
+        return f;
     }
 
     public int getLevel() {
