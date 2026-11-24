@@ -14,6 +14,7 @@ import com.textrpg.meta.Profile;
 import com.textrpg.meta.RunResult;
 import com.textrpg.meta.ShardCalculator;
 import com.textrpg.meta.UpgradeType;
+import com.textrpg.save.CorruptedRunException;
 import com.textrpg.save.SaveLoadException;
 import com.textrpg.save.SaveManager;
 import com.textrpg.save.SlotData;
@@ -124,6 +125,13 @@ public class GameManager {
         }
         try {
             profile = saveManager.load(slot).profile();
+        } catch (CorruptedRunException e) {
+            view.printLine("세이브 파일 오류: " + e.getMessage());
+            if (!input.confirm("진행 중인 탐험만 지우고 파편·강화·기록은 유지할까요?")) {
+                return GameState.MAIN_MENU;
+            }
+            profile = e.getProfile();
+            saveManager.clearRun(slot, profile);
         } catch (SaveLoadException e) {
             view.printLine("세이브 파일 오류: " + e.getMessage());
             if (!input.confirm("이 슬롯을 지우고 새로 시작할까요?")) {
@@ -231,7 +239,7 @@ public class GameManager {
         player.setPos(first.getStartPos());
         run = new GameContext(player, first, new RunResult());
         run.getLog().add("어둠 속으로 들어왔습니다. ? 를 누르면 도움말을 볼 수 있습니다.");
-        // TODO(A, 2단계): 탐험 저장(SlotCodec 탐험 섹션) 구현 후 saveManager.save(slot, SlotData.withRun(profile, run))
+        saveManager.save(slot, SlotData.withRun(profile, run));
     }
 
     /** 캐릭터 이름을 입력받는다. 비워 두면 기본 이름, 너무 길면 다시 묻는다. */
@@ -256,10 +264,11 @@ public class GameManager {
         return jobs.get(choice - 1);
     }
 
-    /** 세이브의 진행 중 탐험을 불러온다. */
+    /** 세이브의 진행 중 탐험을 불러온다. 슬롯 메뉴는 탐험이 있을 때만 이어하기를 보여 준다. */
     private void continueRun() {
-        // TODO(A, 2단계): run = saveManager.load(slot).run().orElseThrow()
-        throw new UnsupportedOperationException("GameManager.continueRun 은 아직 구현되지 않았습니다.");
+        run = saveManager.load(slot).run()
+                .orElseThrow(() -> new IllegalStateException("이어할 탐험이 없습니다: 슬롯 " + slot));
+        run.getLog().add("지난 탐험을 이어 갑니다. 지하 " + run.getFloor().getLevel() + "층");
     }
 
     /**
@@ -380,12 +389,11 @@ public class GameManager {
 
     /**
      * 저장 후 종료: 진행 중인 탐험을 그대로 저장하고 슬롯 메뉴로 돌아간다.
-     * 탐험 저장(2단계) 전까지는 안내만 하고 탐험을 이어 간다. 프로필은 이미 저장되어 있다.
      */
     private GameState saveAndQuit() {
-        // TODO(A, 2단계): saveManager.save(slot, SlotData.withRun(profile, run)) → run = null → SLOT_MENU
-        run.getLog().add("탐험 저장은 아직 준비 중입니다. 파편·강화·기록은 자동으로 저장됩니다.");
-        return GameState.PLAYING;
+        saveManager.save(slot, SlotData.withRun(profile, run));
+        run = null;
+        return GameState.SLOT_MENU;
     }
 
     /**
