@@ -26,6 +26,20 @@ public interface ItemUser {
     int restoreMp(int amount);
 
     /**
+     * 최대 HP. 최대치의 비율로 회복하는 물약이 회복량을 계산할 때 쓴다.
+     *
+     * @return 최대 HP
+     */
+    int getMaxHp();
+
+    /**
+     * 최대 MP. 최대치의 비율로 회복하는 물약이 회복량을 계산할 때 쓴다.
+     *
+     * @return 최대 MP
+     */
+    int getMaxMp();
+
+    /**
      * 무기나 방어구를 장착한다.
      *
      * @param item 장착할 아이템

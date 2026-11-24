@@ -75,7 +75,8 @@ public final class PlayerSkeletonCheck {
 
         Item sword = ItemFactory.createById("IRON_SWORD");
         check("아이템 설명 있음", !sword.getDescription().isBlank());
-        check("철 검 1~3층 드랍", sword.canDropOn(1) && sword.canDropOn(3) && !sword.canDropOn(4));
+        check("철 검 2~3층 드랍 (장비는 2층부터)", !sword.canDropOn(1) && sword.canDropOn(2) && sword.canDropOn(3)
+                && !sword.canDropOn(4));
     }
 
     private static void checkStatSum() {
@@ -124,8 +125,9 @@ public final class PlayerSkeletonCheck {
         Player p = new Player("용사", Job.WARRIOR);
         p.takeDamage(15);
         String message = potion.use(p);
-        check("물약 HP 10 회복 (15 -> 25)", p.getStats().getHp() == 25);
-        check("물약 문장에 실제 회복량 10", message.contains("HP 를 10"));
+        check("물약 최대 HP 30 의 25% = 8 회복 (15 -> 23)", p.getStats().getHp() == 23);
+        check("물약 문장에 실제 회복량 8", message.contains("HP 를 8"));
+        check("치유 물약 문장에 MP 없음", !message.contains("MP"));
 
         p.getStats().setHp(27);
         message = potion.use(p);
@@ -144,6 +146,16 @@ public final class PlayerSkeletonCheck {
 
         @Override
         public int restoreMp(int amount) {
+            return 0;
+        }
+
+        @Override
+        public int getMaxHp() {
+            return 0;
+        }
+
+        @Override
+        public int getMaxMp() {
             return 0;
         }
 
@@ -318,8 +330,10 @@ public final class PlayerSkeletonCheck {
             }
         }
         check("무작위 아이템은 항상 그 층에서 나올 수 있는 것", allFitFloor);
-        check("1층에서는 4종 모두 나옴", seenOnFloor1.size() == 4);
-        check("5층에서는 물약만 (검·갑옷은 1~3층)", seenOnFloor5.equals(java.util.Set.of("HP_POTION_S", "MP_POTION_S")));
+        check("1층에서는 작은 물약 2종과 가죽 갑옷만 (나머지 장비는 2층부터)",
+                seenOnFloor1.equals(java.util.Set.of("HP_POTION_S", "MP_POTION_S", "LEATHER_ARMOR")));
+        check("5층에는 2~3층 장비(철 검·가죽 갑옷)가 없음",
+                !seenOnFloor5.contains("IRON_SWORD") && !seenOnFloor5.contains("LEATHER_ARMOR"));
         Item a = ItemFactory.createRandom(1);
         Item b = ItemFactory.createRandom(1);
         check("부를 때마다 새 아이템 객체", a != b);
@@ -345,8 +359,8 @@ public final class PlayerSkeletonCheck {
         p.getInventory().add(ItemFactory.createById("HP_POTION_S"));
         p.takeDamage(15);
         String message = p.useItem(0);
-        check("가방 0번 물약 사용 -> HP 15 -> 25", p.getStats().getHp() == 25);
-        check("물약의 결과 문장을 그대로 돌려줌", message.contains("HP 를 10"));
+        check("가방 0번 물약 사용 -> HP 15 -> 23 (최대 30 의 25%)", p.getStats().getHp() == 23);
+        check("물약의 결과 문장을 그대로 돌려줌", message.contains("HP 를 8"));
         check("마신 물약은 가방에서 사라짐", p.getInventory().size() == 0);
 
         Item sword = ItemFactory.createById("IRON_SWORD");
@@ -415,8 +429,8 @@ public final class PlayerSkeletonCheck {
         mage.getStats().setMp(0);
         mage.getInventory().add(ItemFactory.createById("MP_POTION_S"));
         String message = mage.useItem(0);
-        check("마나 물약: MP 0 -> 5", mage.getStats().getMp() == 5);
-        check("마나 물약 문장에 MP 5", message.contains("MP 를 5"));
+        check("마나 물약: 최대 MP 20 의 30% = 6 (0 -> 6)", mage.getStats().getMp() == 6);
+        check("마나 물약 문장에 MP 6", message.contains("MP 를 6"));
         check("마신 마나 물약은 가방에서 사라짐", mage.getInventory().size() == 0);
     }
 
