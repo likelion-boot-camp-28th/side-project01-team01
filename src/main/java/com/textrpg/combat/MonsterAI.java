@@ -51,6 +51,9 @@ public class MonsterAI {
             }
 
             for (int i = 0; i < actionCount; i++) {
+                if (!player.isAlive()) {
+                    return;
+                }
                 moveOrAttack(monster, player, floor, log);
             }
             if (ctx.getTurn() % ZERO_SPEED_ACTION_INTERVAL == 0 && monster.getType().getSpeed() == 0) {
