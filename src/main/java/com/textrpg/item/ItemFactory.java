@@ -12,14 +12,14 @@ import com.textrpg.util.RandomUtil;
 public final class ItemFactory {
 
     /** 무작위로 고를 수 있는 모든 아이템 id. 새 아이템을 만들면 여기에도 추가한다. */
-    private static final String[] ALL_IDS = {"IRON_SWORD", "LEATHER_ARMOR", "HP_POTION_S"};
+    private static final String[] ALL_IDS = {"IRON_SWORD", "LEATHER_ARMOR", "HP_POTION_S", "MP_POTION_S"};
 
     private ItemFactory() {
     }
 
     /**
      * id 로 아이템을 만든다. 모르는 id 면 IllegalArgumentException.
-     * 지금은 테스트용 3종만 있다. 나머지 아이템은 TODO(B).
+     * 지금은 4종(철 검, 가죽 갑옷, 치유 물약, 마나 물약)이 있다. 나머지 아이템은 TODO(B).
      */
     public static Item createById(String id) {
         // 인자 순서: id, 이름, 설명, 최소 드랍 층, 최대 드랍 층, 수치...
@@ -31,6 +31,8 @@ public final class ItemFactory {
                     "질긴 가죽으로 만든 갑옷. 방어력 +2", 1, 3, 2);
             case "HP_POTION_S" -> new Potion("HP_POTION_S", "작은 치유 물약",
                     "마시면 HP 를 10 회복한다.", 1, 5, 10, 0);
+            case "MP_POTION_S" -> new Potion("MP_POTION_S", "작은 마나 물약",
+                    "마시면 MP 를 5 회복한다.", 1, 5, 0, 5);
             default -> throw new IllegalArgumentException("모르는 아이템 id: " + id);
         };
     }

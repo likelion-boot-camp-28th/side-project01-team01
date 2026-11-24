@@ -40,6 +40,10 @@ public final class PlayerSkeletonCheck {
         checkApplyTo();
         checkFloorItem();
         checkCreateRandom();
+        checkDropItem();
+        checkUseItem();
+        checkEquip();
+        checkStartPotionAndMpPotion();
 
         System.out.println("통과 " + passed + " / 실패 " + failed);
         if (failed > 0) {
@@ -312,11 +316,106 @@ public final class PlayerSkeletonCheck {
             }
         }
         check("무작위 아이템은 항상 그 층에서 나올 수 있는 것", allFitFloor);
-        check("1층에서는 3종 모두 나옴", seenOnFloor1.size() == 3);
-        check("5층에서는 물약만 (검·갑옷은 1~3층)", seenOnFloor5.equals(java.util.Set.of("HP_POTION_S")));
+        check("1층에서는 4종 모두 나옴", seenOnFloor1.size() == 4);
+        check("5층에서는 물약만 (검·갑옷은 1~3층)", seenOnFloor5.equals(java.util.Set.of("HP_POTION_S", "MP_POTION_S")));
         Item a = ItemFactory.createRandom(1);
         Item b = ItemFactory.createRandom(1);
         check("부를 때마다 새 아이템 객체", a != b);
+    }
+
+
+    private static void checkDropItem() {
+        Player p = new Player("용사", Job.WARRIOR);
+        Item sword = ItemFactory.createById("IRON_SWORD");
+        Item potion = ItemFactory.createById("HP_POTION_S");
+        p.getInventory().add(sword);
+        p.getInventory().add(potion);
+
+        Item dropped = p.dropItem(0);
+        check("버린 아이템을 돌려줌 (0번 = 철 검)", dropped == sword);
+        check("가방에서 빠짐 (2개 -> 1개)", p.getInventory().size() == 1);
+        check("남은 아이템이 0번으로 당겨짐", p.getInventory().get(0) == potion);
+    }
+
+
+    private static void checkUseItem() {
+        Player p = new Player("용사", Job.WARRIOR);
+        p.getInventory().add(ItemFactory.createById("HP_POTION_S"));
+        p.takeDamage(15);
+        String message = p.useItem(0);
+        check("가방 0번 물약 사용 -> HP 15 -> 25", p.getStats().getHp() == 25);
+        check("물약의 결과 문장을 그대로 돌려줌", message.contains("HP 를 10"));
+        check("마신 물약은 가방에서 사라짐", p.getInventory().size() == 0);
+
+        Item sword = ItemFactory.createById("IRON_SWORD");
+        Item potion1 = ItemFactory.createById("HP_POTION_S");
+        Item potion2 = ItemFactory.createById("HP_POTION_S");
+        p.getInventory().add(sword);
+        p.getInventory().add(potion1);
+        p.getInventory().add(potion2);
+        p.useItem(2);
+        check("같은 물약 2개 중 마신 것(2번)만 빠짐",
+                p.getInventory().size() == 2 && p.getInventory().get(1) == potion1);
+        check("다른 아이템(철 검)은 그대로", p.getInventory().get(0) == sword);
+    }
+
+
+    private static void checkEquip() {
+        Player p = new Player("용사", Job.WARRIOR);
+        int bareAttack = p.getAttack();
+        Item sword1 = ItemFactory.createById("IRON_SWORD");
+        Item potion = ItemFactory.createById("HP_POTION_S");
+        p.getInventory().add(sword1);
+        p.getInventory().add(potion);
+
+        String message = p.useItem(0);
+        check("맨손에서 검 장착 -> 장착 문장", message.contains("장착했다"));
+        check("무기 칸에 검", p.getWeapon().isPresent() && p.getWeapon().get() == sword1);
+        check("공격력 +3", p.getAttack() == bareAttack + 3);
+        check("검은 가방에서 빠짐 (물약만 남음)", p.getInventory().size() == 1 && p.getInventory().get(0) == potion);
+
+        Item sword2 = ItemFactory.createById("IRON_SWORD");
+        p.getInventory().add(sword2);
+        p.useItem(1);
+        check("검 교체: 새 검이 무기 칸에", p.getWeapon().get() == sword2);
+        check("원래 검은 가방으로 돌아옴", p.getInventory().getItems().contains(sword1)
+                && !p.getInventory().getItems().contains(sword2) && p.getInventory().size() == 2);
+
+        Item armor = ItemFactory.createById("LEATHER_ARMOR");
+        p.getInventory().add(armor);
+        int defenseBefore = p.getDefense();
+        p.useItem(2);
+        check("갑옷 장착 -> 방어력 +2", p.getArmor().isPresent() && p.getDefense() == defenseBefore + 2);
+        check("무기는 그대로", p.getWeapon().get() == sword2);
+
+        String refuse = p.equip(potion);
+        check("물약은 장착할 수 없음", refuse.contains("장착할 수 없다"));
+    }
+
+
+    private static void checkStartPotionAndMpPotion() {
+        Player none = new Player("용사", Job.WARRIOR);
+        Profile.newProfile().applyTo(none);
+        check("보급품 강화 없으면 시작 물약 0개", none.getInventory().size() == 0);
+
+        Profile profile = Profile.newProfile();
+        profile.recordRun(new RunResult(), 75);
+        profile.buy(UpgradeType.START_POTION);
+        profile.buy(UpgradeType.START_POTION);
+        Player p = new Player("용사", Job.WARRIOR);
+        profile.applyTo(p);
+        check("보급품 2단계 -> 시작 물약 2개", p.getInventory().size() == 2
+                && p.getInventory().get(0).getId().equals("HP_POTION_S")
+                && p.getInventory().get(1).getId().equals("HP_POTION_S"));
+        check("시작 물약은 서로 다른 객체", p.getInventory().get(0) != p.getInventory().get(1));
+
+        Player mage = new Player("마법사", Job.MAGE);
+        mage.getStats().setMp(0);
+        mage.getInventory().add(ItemFactory.createById("MP_POTION_S"));
+        String message = mage.useItem(0);
+        check("마나 물약: MP 0 -> 5", mage.getStats().getMp() == 5);
+        check("마나 물약 문장에 MP 5", message.contains("MP 를 5"));
+        check("마신 마나 물약은 가방에서 사라짐", mage.getInventory().size() == 0);
     }
 
 

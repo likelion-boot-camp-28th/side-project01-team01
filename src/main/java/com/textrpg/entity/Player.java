@@ -6,6 +6,7 @@ import com.textrpg.core.Position;
 import com.textrpg.item.Armor;
 import com.textrpg.item.Inventory;
 import com.textrpg.item.Item;
+import com.textrpg.item.ItemFactory;
 import com.textrpg.item.ItemUser;
 import com.textrpg.item.Weapon;
 
@@ -131,6 +132,16 @@ public class Player extends Entity implements ItemUser {
         gold += Math.max(0, amount);
     }
 
+    /**
+     * 시작 보급품: 치유 물약 count 개를 가방에 넣는다 (영구 강화 START_POTION).
+     * meta 패키지는 item 을 import 할 수 없어서(패키지 의존 방향) Profile.applyTo() 가 이 메서드를 부른다.
+     */
+    public void giveStartPotions(int count) {
+        for (int i = 0; i < count; i++) {
+            inventory.add(ItemFactory.createById("HP_POTION_S"));
+        }
+    }
+
     public void setExpMultiplier(double expMultiplier) {
         this.expMultiplier = expMultiplier;
     }
@@ -174,16 +185,49 @@ public class Player extends Entity implements ItemUser {
      */
     @Override
     public String equip(Item item) {
-        // TODO(B): Weapon 이면 weapon 칸, Armor 이면 armor 칸에 끼우고, 원래 장비는 가방으로
-        throw new UnsupportedOperationException("TODO(B): Player.equip");
+        if (item instanceof Weapon) {
+            Weapon newWeapon = (Weapon) item;
+            Weapon oldWeapon = weapon;                   // ① 원래 무기 기억해 두기 (없으면 null)
+
+            int index = inventory.getItems().indexOf(newWeapon);   // ② 새 무기를 가방에서 빼기
+            if (index >= 0) {
+                inventory.remove(index);
+            }
+
+            weapon = newWeapon;
+
+            if (oldWeapon != null) {                     // ④ 원래 무기가 있었으면 가방으로
+                inventory.add(oldWeapon);
+            }
+            return newWeapon.getDisplayName() + "을(를) 장착했다.";
+
+        }
+
+        if (item instanceof Armor) {
+            Armor newArmor = (Armor) item;
+            Armor oldArmor = armor;
+
+            int index = inventory.getItems().indexOf(newArmor);
+            if (index >= 0) {
+                inventory.remove(index);
+            }
+
+            armor = newArmor;
+
+            if (oldArmor != null) {
+                inventory.add(oldArmor);
+            }
+            return newArmor.getDisplayName() + "을(를) 장착했다.";
+        }
+
+        return item.getDisplayName() + "은(는) 장착할 수 없다.";
     }
 
     /**
      * 가방의 index 번 아이템을 사용한다. 결과 문장을 돌려준다.
      */
     public String useItem(int index) {
-        // TODO(B): inventory.get(index).use(this)
-        throw new UnsupportedOperationException("TODO(B): Player.useItem");
+        return inventory.get(index).use(this);
     }
 
     /**
@@ -191,8 +235,7 @@ public class Player extends Entity implements ItemUser {
      * Player 가 Floor 를 알면 entity → map → monster → entity 로 패키지가 서로를 참조하게 되기 때문이다.
      */
     public Item dropItem(int index) {
-        // TODO(B): inventory.remove(index)
-        throw new UnsupportedOperationException("TODO(B): Player.dropItem");
+        return inventory.remove(index);
     }
 
     /**
