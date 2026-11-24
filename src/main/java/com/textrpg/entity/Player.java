@@ -1,5 +1,6 @@
 package com.textrpg.entity;
 
+import java.util.List;
 import java.util.Optional;
 
 import com.textrpg.core.Position;
@@ -39,7 +40,7 @@ public class Player extends Entity implements ItemUser {
     private Armor armor;
     private final Inventory inventory = new Inventory();
     /**
-     * 경험치 배율. 영구 강화(배움의 축복, P1)가 Profile.applyTo()다. 에서 바꾼
+     * 경험치 배율. 영구 강화(배움의 축복, P1)에 따라 Profile.applyRunModifiers() 에서 바꾼다.
      */
     private double expMultiplier = 1.0;
 
@@ -49,6 +50,74 @@ public class Player extends Entity implements ItemUser {
     public Player(String name, Job job) {
         super(name, SYMBOL, new Position(0, 0), job.createBaseStats());
         this.job = job;
+    }
+
+    /**
+     * 세이브 파일([PLAYER], [INVENTORY])에서 읽은 값으로 플레이어를 되살린다. SaveManager(SlotCodec) 가 호출한다.
+     *
+     * <p>attack·defense 는 장비 보너스를 뺀 기본값이다 (getBaseAttack()·getBaseDefense() 로 저장한 값).
+     * 무기·방어구와 가방 아이템은 SlotCodec 이 ItemFactory.createById() 로 만들어 넘긴다 (팀 규칙: Factory 로만 생성).
+     * 강화로 늘어난 가방 칸·경험치 배율은 저장하지 않으므로, 불러온 뒤 Profile.applyRunModifiers(player) 를 부른다.
+     *
+     * @param weapon 끼고 있던 무기. 없으면 null
+     * @param armor  입고 있던 방어구. 없으면 null
+     * @param items  가방 안 아이템 (순서대로)
+     * @throws IllegalArgumentException 값이 범위를 벗어나거나 무기 칸에 무기가 아닌 아이템이 올 때
+     *                                  (SlotCodec 이 SaveLoadException 으로 감싼다)
+     */
+    public static Player restore(String name, Job job, int level, int exp, int gold,
+                                 int hp, int maxHp, int mp, int maxMp, int attack, int defense,
+                                 Position pos, Item weapon, Item armor, List<Item> items) {
+        if (level < 1) {
+            throw new IllegalArgumentException("level 은 1 이상입니다: " + level);
+        }
+        if (exp < 0 || exp >= level * EXP_PER_LEVEL) {
+            throw new IllegalArgumentException(
+                    "exp 는 0 ~ " + (level * EXP_PER_LEVEL - 1) + " 입니다: " + exp);
+        }
+        if (gold < 0) {
+            throw new IllegalArgumentException("gold 는 0 이상입니다: " + gold);
+        }
+        if (maxHp < 1 || hp < 1 || hp > maxHp) {
+            throw new IllegalArgumentException("hp 는 1 ~ maxHp 입니다: " + hp + "/" + maxHp);
+        }
+        if (maxMp < 0 || mp < 0 || mp > maxMp) {
+            throw new IllegalArgumentException("mp 는 0 ~ maxMp 입니다: " + mp + "/" + maxMp);
+        }
+        if (attack < 0 || defense < 0) {
+            throw new IllegalArgumentException("attack·defense 는 0 이상입니다: " + attack + ", " + defense);
+        }
+        if (weapon != null && !(weapon instanceof Weapon)) {
+            throw new IllegalArgumentException("무기 칸에 무기가 아닌 아이템이 있습니다: " + weapon.getId());
+        }
+        if (armor != null && !(armor instanceof Armor)) {
+            throw new IllegalArgumentException("방어구 칸에 방어구가 아닌 아이템이 있습니다: " + armor.getId());
+        }
+
+        Player p = new Player(name, job);
+        p.level = level;
+        p.exp = exp;
+        p.gold = gold;
+
+        Stats stats = p.getStats();
+        stats.addMaxHp(maxHp - stats.getMaxHp());
+        stats.setHp(hp);
+        stats.addMaxMp(maxMp - stats.getMaxMp());
+        stats.setMp(mp);
+        stats.setAttack(attack);
+        stats.setDefense(defense);
+
+        p.setPos(pos);
+        p.weapon = (Weapon) weapon;
+        p.armor = (Armor) armor;
+
+        // 큰 가방 강화로 기본 칸보다 많이 들고 있었을 수 있으니, 우선 다 들어가게 칸을 맞춘다.
+        // 정확한 칸 수는 Profile.applyRunModifiers() 가 다시 맞춘다.
+        p.inventory.setExtraCapacity(items.size() - Inventory.CAPACITY);
+        for (Item item : items) {
+            p.inventory.add(item);
+        }
+        return p;
     }
 
     /**
@@ -246,5 +315,4 @@ public class Player extends Entity implements ItemUser {
             heal(1);
         }
     }
-    // TODO(B, A와 합의): 세이브 복원용으로 level, exp, gold, hp 등을 넣는 방법 (SaveManager 2차에서 필요)
 }
