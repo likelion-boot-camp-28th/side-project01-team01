@@ -9,17 +9,25 @@ public class InputHandler {
 
     private final Scanner scanner = new Scanner(System.in, java.nio.charset.StandardCharsets.UTF_8);
 
-    /** 한 줄을 읽어 앞뒤 공백을 제거해 돌려준다. 입력 스트림이 끝나면 빈 문자열. */
+    /**
+     * 한 줄을 읽어 앞뒤 공백을 제거해 돌려준다.
+     *
+     * @throws InputClosedException 입력 스트림이 끝났을 때
+     */
     public String readLine(String prompt) {
         System.out.print(prompt);
         System.out.flush();
         if (!scanner.hasNextLine()) {
-            return "";
+            throw new InputClosedException();
         }
         return scanner.nextLine().trim();
     }
 
-    /** min~max 사이 정수가 들어올 때까지 다시 묻는다. */
+    /**
+     * min~max 사이 정수가 들어올 때까지 다시 묻는다.
+     *
+     * @throws InputClosedException 입력 스트림이 끝났을 때
+     */
     public int readInt(String prompt, int min, int max) {
         while (true) {
             String line = readLine(prompt);
@@ -35,7 +43,11 @@ public class InputHandler {
         }
     }
 
-    /** y/n 확인. y 또는 yes 면 true. */
+    /**
+     * y/n 확인. y 또는 yes 면 true.
+     *
+     * @throws InputClosedException 입력 스트림이 끝났을 때
+     */
     public boolean confirm(String prompt) {
         String line = readLine(prompt + " (y/n): ").toLowerCase();
         return line.equals("y") || line.equals("yes");

@@ -1,5 +1,6 @@
 package com.textrpg.game;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -11,9 +12,11 @@ import com.textrpg.map.DungeonGenerator;
 import com.textrpg.map.Floor;
 import com.textrpg.meta.Profile;
 import com.textrpg.meta.RunResult;
+import com.textrpg.meta.UpgradeType;
 import com.textrpg.save.SaveLoadException;
 import com.textrpg.save.SaveManager;
 import com.textrpg.ui.ConsoleView;
+import com.textrpg.ui.InputClosedException;
 import com.textrpg.ui.InputHandler;
 
 /**
@@ -30,13 +33,14 @@ import com.textrpg.ui.InputHandler;
  * </pre>
  *
  * <p>세이브 파일 오류(SaveLoadException)는 여기서 잡아 안내한 뒤 메인 메뉴로 돌아간다. 게임을 종료하지 않는다 (Team_Rules 2.9).
+ * 입력 스트림이 끝나면(InputClosedException) 저장하지 않고 종료한다. 강제 종료와 같아서 마지막 저장 시점이 남는다.
  */
 public class GameManager {
 
     private static final String COMMAND_PROMPT = "명령 (w/a/s/d 이동, g 줍기, i 가방, > 내려가기, ? 도움말): ";
     private static final String PRESS_ENTER = "Enter 를 누르면 돌아갑니다.";
     private static final int MAX_NAME_LENGTH = 12;
-    /** 이름을 비워 두면 쓰는 기본 이름. 입력 스트림이 끝났을 때(빈 문자열)도 여기서 멈춘다. */
+    /** 이름을 비워 두면 쓰는 기본 이름. */
     private static final String DEFAULT_NAME = "모험가";
 
     private final ConsoleView view;
@@ -61,22 +65,32 @@ public class GameManager {
 
     /** QUIT 이 될 때까지 화면을 차례로 보여 준다. Main 이 호출한다. */
     public void start() {
-        while (state != GameState.QUIT) {
-            try {
-                state = switch (state) {
-                    case MAIN_MENU -> showMainMenu();
-                    case SLOT_MENU -> showSlotMenu();
-                    case ALTAR -> showAltar();
-                    case RECORDS -> showRecords();
-                    case PLAYING -> playRun();
-                    case DEAD -> endRun(false);
-                    case VICTORY -> endRun(true);
-                    case QUIT -> GameState.QUIT;
-                };
-            } catch (SaveLoadException e) {
-                view.printLine("세이브 파일 오류: " + e.getMessage());
-                state = GameState.MAIN_MENU;
+        try {
+            while (state != GameState.QUIT) {
+                state = nextState();
             }
+        } catch (InputClosedException e) {
+            view.printLine("");
+            view.printLine("입력이 끝나 게임을 종료합니다.");
+        }
+    }
+
+    /** 지금 상태의 화면을 하나 보여 주고 다음 상태를 돌려준다. 세이브 오류는 안내 후 메인 메뉴로. */
+    private GameState nextState() {
+        try {
+            return switch (state) {
+                case MAIN_MENU -> showMainMenu();
+                case SLOT_MENU -> showSlotMenu();
+                case ALTAR -> showAltar();
+                case RECORDS -> showRecords();
+                case PLAYING -> playRun();
+                case DEAD -> endRun(false);
+                case VICTORY -> endRun(true);
+                case QUIT -> GameState.QUIT;
+            };
+        } catch (SaveLoadException e) {
+            view.printLine("세이브 파일 오류: " + e.getMessage());
+            return GameState.MAIN_MENU;
         }
     }
 
@@ -86,8 +100,23 @@ public class GameManager {
      * @return 슬롯을 고르면 SLOT_MENU, 종료를 고르면 QUIT
      */
     private GameState showMainMenu() {
-        // TODO(A): saveManager.getSlotSummary(i) 목록 → slot 선택 → load 또는 Profile.newProfile() + save
-        throw new UnsupportedOperationException("GameManager.showMainMenu 는 아직 구현되지 않았습니다.");
+        view.clearScreen();
+        List<String> options = new ArrayList<>();
+        for (int i = 1; i <= SaveManager.SLOT_COUNT; i++) {
+            // TODO(A): SaveManager.getSlotSummary 구현 후 슬롯 요약(파편·최고 층·진행 중 탐험) 표시
+            options.add("슬롯 " + i);
+        }
+        options.add("종료");
+        view.printMenu(ConsoleView.GAME_TITLE, options);
+
+        int choice = input.readInt("번호: ", 1, options.size());
+        if (choice == options.size()) {
+            return GameState.QUIT;
+        }
+        slot = choice;
+        // TODO(A): SaveManager.load 구현 후 세이브가 있으면 프로필을 불러오고, 빈 슬롯이면 새 프로필을 바로 저장
+        profile = Profile.newProfile();
+        return GameState.SLOT_MENU;
     }
 
     /**
@@ -97,8 +126,37 @@ public class GameManager {
      * @return 고른 메뉴에 해당하는 상태
      */
     private GameState showSlotMenu() {
-        // TODO(A): 새 탐험 → newRun(), 이어하기 → continueRun() 후 PLAYING
-        throw new UnsupportedOperationException("GameManager.showSlotMenu 는 아직 구현되지 않았습니다.");
+        view.clearScreen();
+        List<SlotAction> actions = new ArrayList<>(Arrays.asList(SlotAction.values()));
+        if (!hasSavedRun()) {
+            actions.remove(SlotAction.CONTINUE);
+        }
+        view.printMenu("슬롯 " + slot + "  |  파편 " + profile.getShards(),
+                actions.stream().map(SlotAction::label).toList());
+
+        SlotAction action = actions.get(input.readInt("번호: ", 1, actions.size()) - 1);
+        return switch (action) {
+            case NEW_RUN -> {
+                if (hasSavedRun() && !input.confirm("진행 중인 탐험이 사라집니다. 새로 시작할까요?")) {
+                    yield GameState.SLOT_MENU;
+                }
+                newRun();
+                yield GameState.PLAYING;
+            }
+            case CONTINUE -> {
+                continueRun();
+                yield GameState.PLAYING;
+            }
+            case ALTAR -> GameState.ALTAR;
+            case RECORDS -> GameState.RECORDS;
+            case BACK -> GameState.MAIN_MENU;
+        };
+    }
+
+    /** 이 슬롯에 저장된 진행 중 탐험이 있는지. 슬롯 메뉴의 "이어하기" 표시와 새 탐험 확인에 쓴다. */
+    private boolean hasSavedRun() {
+        // TODO(A): SaveManager.load 구현 후 saveManager.load(slot).hasRun() — 지금은 저장이 없어 항상 false
+        return false;
     }
 
     /**
@@ -107,8 +165,24 @@ public class GameManager {
      * @return SLOT_MENU
      */
     private GameState showAltar() {
-        // TODO(A): view.printAltar(profile) → 번호 입력 → profile.buy(type) → saveManager.save(slot, profileOnly)
-        throw new UnsupportedOperationException("GameManager.showAltar 는 아직 구현되지 않았습니다.");
+        view.clearScreen();
+        UpgradeType[] types = UpgradeType.values();
+        while (true) {
+            view.printAltar(profile);
+            int choice = input.readInt("강화 번호 (0: 돌아가기): ", 0, types.length);
+            if (choice == 0) {
+                return GameState.SLOT_MENU;
+            }
+            UpgradeType type = types[choice - 1];
+            if (profile.buy(type)) {
+                // TODO(A): SaveManager.save 구현 후 saveManager.save(slot, SlotData.profileOnly(profile))
+                view.printLine(type.getDisplayName() + " " + profile.getLevel(type) + "단계를 얻었습니다.");
+            } else if (profile.getLevel(type) >= type.getMaxLevel()) {
+                view.printLine(type.getDisplayName() + " 은(는) 이미 최대 단계입니다.");
+            } else {
+                view.printLine("파편이 부족합니다.");
+            }
+        }
     }
 
     /**
@@ -117,8 +191,10 @@ public class GameManager {
      * @return SLOT_MENU
      */
     private GameState showRecords() {
-        // TODO(A): view.printRecords(profile) → 아무 키나 입력
-        throw new UnsupportedOperationException("GameManager.showRecords 는 아직 구현되지 않았습니다.");
+        view.clearScreen();
+        view.printRecords(profile);
+        waitForEnter();
+        return GameState.SLOT_MENU;
     }
 
     /**
@@ -283,5 +359,24 @@ public class GameManager {
         //  → shards = ShardCalculator.calculate → profile.recordRun → saveManager.clearRun(slot, profile)
         //  → view.printRunResult(runResult, ShardCalculator.breakdown(...)) → run = null
         throw new UnsupportedOperationException("GameManager.endRun 은 아직 구현되지 않았습니다.");
+    }
+
+    /** 슬롯 메뉴 항목. 선언 순서가 화면 순서다. */
+    private enum SlotAction {
+        NEW_RUN("새 탐험"),
+        CONTINUE("이어하기"),
+        ALTAR("어둠의 제단"),
+        RECORDS("기록"),
+        BACK("메인 메뉴로");
+
+        private final String label;
+
+        SlotAction(String label) {
+            this.label = label;
+        }
+
+        String label() {
+            return label;
+        }
     }
 }

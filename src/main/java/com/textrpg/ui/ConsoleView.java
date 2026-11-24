@@ -10,6 +10,7 @@ import com.textrpg.item.Item;
 import com.textrpg.map.Floor;
 import com.textrpg.meta.Profile;
 import com.textrpg.meta.RunResult;
+import com.textrpg.meta.UpgradeType;
 
 /**
  * 모든 콘솔 출력의 단일 창구. 다른 클래스는 System.out 을 직접 쓰지 않는다.
@@ -18,7 +19,7 @@ import com.textrpg.meta.RunResult;
 public class ConsoleView {
 
     private static final String DIVIDER = "-".repeat(60);
-    private static final String GAME_TITLE = "Into the Dark";
+    public static final String GAME_TITLE = "Into the Dark";
     /** 탐험 화면 아래에 보여 줄 최근 메시지 수 (기획서 기능 표 "화면 렌더링": 최근 메시지 3줄). */
     private static final int RECENT_MESSAGES = 3;
     private static final String MESSAGE_PREFIX = "> ";
@@ -126,14 +127,24 @@ public class ConsoleView {
 
     /** 어둠의 제단: 보유 파편과 강화 목록(현재 단계 / 최대 단계 / 다음 비용). 번호는 1부터. */
     public void printAltar(Profile profile) {
-        // TODO(A): UpgradeType.values() 순서대로, 최대 단계면 "완료"
-        throw new UnsupportedOperationException("ConsoleView.printAltar 는 아직 구현되지 않았습니다.");
+        printTitle("어둠의 제단  |  보유 파편 " + profile.getShards());
+        UpgradeType[] types = UpgradeType.values();
+        for (int i = 0; i < types.length; i++) {
+            printLine((i + 1) + ") " + formatUpgrade(types[i], profile.getLevel(types[i])));
+        }
+        printDivider();
     }
 
     /** 프로필 누적 기록: 총 탐험 수, 최고 층, 클리어 수, 누적 처치, 보유 파편. */
     public void printRecords(Profile profile) {
-        // TODO(A)
-        throw new UnsupportedOperationException("ConsoleView.printRecords 는 아직 구현되지 않았습니다.");
+        printTitle("기록");
+        printLine("총 탐험 수   " + profile.getTotalRuns());
+        String bestFloor = profile.getBestFloor() == 0 ? "-" : "지하 " + profile.getBestFloor() + "층";
+        printLine("최고 층      " + bestFloor);
+        printLine("클리어       " + profile.getClears());
+        printLine("누적 처치    " + profile.getTotalKills());
+        printLine("보유 파편    " + profile.getShards());
+        printDivider();
     }
 
     /**
@@ -145,6 +156,15 @@ public class ConsoleView {
     public void printRunResult(RunResult result, List<String> shardBreakdown) {
         // TODO(A): 사망/클리어 제목, 원인, 도달 층, 처치, 레벨, 골드, 파편 내역
         throw new UnsupportedOperationException("ConsoleView.printRunResult 는 아직 구현되지 않았습니다.");
+    }
+
+    /** 제단 한 줄. 예: "강인한 육체 - 최대 HP +5  (2/5단계, 다음 60 파편)". 최대 단계면 "완료". */
+    static String formatUpgrade(UpgradeType type, int level) {
+        String progress = level >= type.getMaxLevel()
+                ? "완료"
+                : "다음 " + type.costFor(level + 1) + " 파편";
+        return type.getDisplayName() + " - " + type.getDescription()
+                + "  (" + level + "/" + type.getMaxLevel() + "단계, " + progress + ")";
     }
 
     /** 탐험 화면 맨 윗줄. 한글은 터미널에서 두 칸을 차지해 길이로 정렬하면 어긋나므로 구분자로 나눈다. */
