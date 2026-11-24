@@ -269,6 +269,8 @@ classDiagram
         -levelUp()
         +equip(Item item) String
         +restoreMp(int amount) int
+        +getMaxHp() int
+        +getMaxMp() int
         +useItem(int index) String
         +dropItem(int index) Item
         +addGold(int amount)
@@ -307,9 +309,16 @@ classDiagram
     class ItemKind {
         <<enumeration>>
         IRON_SWORD
+        STEEL_SWORD
+        RUNE_BLADE
         LEATHER_ARMOR
+        CHAIN_MAIL
+        STEEL_PLATE
+        GUARDIAN_PLATE
         HP_POTION_S
+        HP_POTION_L
         MP_POTION_S
+        MP_POTION_L
         -String displayName
         -String description
         -int minFloor
@@ -336,8 +345,8 @@ classDiagram
         +use(ItemUser user) String
     }
     class Potion {
-        -int hpRestore
-        -int mpRestore
+        -int hpPercent
+        -int mpPercent
         +use(ItemUser user) String
     }
     class Scroll {
@@ -387,6 +396,8 @@ classDiagram
         <<interface>>
         +heal(int amount) int
         +restoreMp(int amount) int
+        +getMaxHp() int
+        +getMaxMp() int
         +equip(Item item) String
         +getInventory() Inventory
     }
@@ -518,7 +529,7 @@ classDiagram
 > 몬스터 확률 스탯: `MonsterType` 생성자에서 `speed`로 계산해 `hitRate`·`critRate`·`evadeRate`에 저장하고, `Monster` 생성자는 이 값으로 `Stats`를 만든다. 몬스터 밸런스 수치는 모두 `MonsterType` 한곳에 둔다.
 >   명중 = 70 + 15×speed, 치명타 = 5×speed, 회피 = 5×speed (단위 %, 몬스터 MP는 0)
 > 명중 판정: `chance(공격자 명중) && !chance(방어자 회피)`. 실제 명중 확률 = 명중 × (1 − 회피).
-> 데미지: 명중 실패 시 0 → `calculate()`가 `max(1, round((공격 - 방어) × 0.9~1.1))` → 치명타 시 `applyCritical()`이 `round(데미지 × 1.5)`.
+> 데미지: 명중 실패 시 0 → `calculate()`가 `max(1, round(공격 × 6 / (6 + 방어) × 0.9~1.1))` (6 = `DEFENSE_CONSTANT`, 방어 6 이면 절반 감소, 방어가 높을수록 추가 효율 감소) → 치명타 시 `applyCritical()`이 `round(데미지 × 1.5)`.
 > 생성: `Monster`·`Boss`·`PileOfBones` 생성자는 package-private이라 `MonsterFactory`로만 만들 수 있다 (Team_Rules 1.2).
 >   `create(MonsterType, pos)`에 ABYSS_WARDEN을 넘기면 `Boss`를 돌려준다. PILE_OF_BONES를 넘기면 `IllegalArgumentException`을 던진다 (부활 턴 계산에 탄생 턴이 필요하기 때문). 뼈 무더기는 `create(PILE_OF_BONES, pos, birth)` 또는 `createBones(pos, birth)`로 만들고, `create(type, pos, birth)`에 다른 타입을 넘기면 `IllegalArgumentException`을 던진다.
 >   `createRandom(floorLevel, pos)`는 보스를 뺀 일반 몬스터 중 minFloor ≤ floorLevel ≤ maxFloor인 종류를 무작위로 고른다.
@@ -530,8 +541,8 @@ classDiagram
 > 몬스터 특수 능력:
 > - **해골 병사 → 뼈 무더기**: `CombatSystem.rewardKill()`에서 SKELETON이 처치되면 같은 자리에 `MonsterFactory.createBones(pos, ctx.getTurn())`으로 뼈 무더기(`P`)를 놓는다. 해골 병사 자체는 경험치·골드가 0이고 처치 수(파편)에도 세지 않는다. 보상(14/14)과 처치 수 1은 뼈 무더기를 부숴야 받는다. 뼈 무더기는 생성 즉시 깨어 있고, 공격·이동하지 않으며(speed -1), `PileOfBones.isTimeToRevive(turn)`이 `turn >= birth + REVIVE_DURATION(4)`이 되면 `MonsterAI.act()`가 뼈 무더기를 빼고 그 자리에 `MonsterFactory.create(SKELETON, pos)`로 HP가 가득 찬 해골 병사를 놓는다.
 > - **오크**: 체력이 비정상적으로 높다 (`MonsterType` HP 40).
-> - **그림자 기사 재생**: 깨어 있는 동안 행동 전 매 턴 HP +`MonsterAI.SHADOW_KNIGHT_RESTORATION`(4).
-> - **어둠의 파수꾼**: 기본 speed 2로 매 턴 2회 행동. HP가 최대 HP의 절반 이하이면 `restore()`가 매 턴 HP +`ENRAGED_HEAL`(5) 재생하고, `attacksPerTurn()`은 3회 행동을 돌려준다.
+> - **그림자 기사 재생**: 깨어 있는 동안 행동 전 매 턴 HP +`MonsterAI.SHADOW_KNIGHT_RESTORATION`(2).
+> - **어둠의 파수꾼**: speed 2(명중·치명·회피율에만 사용). 공격 횟수는 `attacksPerTurn()`이 정해 평소 매 턴 1회. HP가 최대 HP의 절반 이하이면 `restore()`가 매 턴 HP +`ENRAGED_HEAL`(2) 재생하고, `attacksPerTurn()`은 2회를 돌려준다.
 
 ---
 
