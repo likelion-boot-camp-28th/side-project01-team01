@@ -31,6 +31,7 @@ def checkClasses = [
         'com.textrpg.core.MessageLogCheck',
         'com.textrpg.entity.PlayerSkeletonCheck',
         'com.textrpg.game.CommandParserCheck',
+        'com.textrpg.item.ItemFactoryCheck',
         'com.textrpg.map.DungeonGeneratorCheck',
         'com.textrpg.save.SaveFileParserCheck',
         'com.textrpg.save.SaveFileWriterCheck',

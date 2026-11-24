@@ -1,5 +1,8 @@
 package com.textrpg.item;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * 물약. 마시면 HP·MP 를 회복하고 사라진다.
  */
@@ -8,9 +11,8 @@ public class Potion extends Item {
     private final int hpRestore;
     private final int mpRestore;
 
-    public Potion(String id, String name, String description, int minFloor, int maxFloor,
-                  int hpRestore, int mpRestore) {
-        super(id, name, ItemType.POTION, description, minFloor, maxFloor);
+    Potion(ItemKind kind, int hpRestore, int mpRestore) {
+        super(kind, ItemType.POTION);
         this.hpRestore = hpRestore;
         this.mpRestore = mpRestore;
     }
@@ -21,6 +23,19 @@ public class Potion extends Item {
 
     public int getMpRestore() {
         return mpRestore;
+    }
+
+    /** 회복하는 것만 적는다. 예: "HP 10 회복", "HP 10 · MP 5 회복" */
+    @Override
+    protected String effectText() {
+        List<String> parts = new ArrayList<>();
+        if (hpRestore > 0) {
+            parts.add("HP " + hpRestore);
+        }
+        if (mpRestore > 0) {
+            parts.add("MP " + mpRestore);
+        }
+        return String.join(" · ", parts) + " 회복";
     }
 
     @Override
