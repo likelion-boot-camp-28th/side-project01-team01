@@ -21,7 +21,7 @@ import com.textrpg.util.RandomUtil;
  */
 public class MonsterAI {
 
-    private static final int SHADOW_KNIGHT_RESTORATION = 4;
+    private static final int SHADOW_KNIGHT_RESTORATION = 2;
     private static final int SIGHT_RANGE = 6;
     private static final int ZERO_SPEED_ACTION_INTERVAL = 2;
     private final CombatSystem combat = new CombatSystem();
