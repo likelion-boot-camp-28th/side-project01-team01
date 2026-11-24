@@ -63,10 +63,9 @@ public class CombatSystem {
         }
         int exp = monster.getExpReward();
         int gold = monster.getGoldReward();
-        int preLevel = ctx.getPlayer().getLevel();
         boolean isLevelUp = ctx.getPlayer().gainExp(exp);
         ctx.getPlayer().addGold(gold);
-        int postLevel = ctx.getPlayer().getLevel();
+        int level = ctx.getPlayer().getLevel();
 
         ctx.getFloor().removeMonster(monster);
         if (monster.getType() == MonsterType.SKELETON) {
@@ -78,7 +77,7 @@ public class CombatSystem {
             ctx.getLog().add("처치 보상이 정산됩니다. +" + exp + "exp +" + gold + "gold");
         }
         if (isLevelUp) {
-            ctx.getLog().add("레벨업했습니다. +" + (postLevel - preLevel));
+            ctx.getLog().add("레벨이 올랐습니다. (Lv." + level + ")");
         }
     }
 }
