@@ -509,7 +509,7 @@ classDiagram
 >   `create(MonsterType, pos)`에 ABYSS_WARDEN을 넘기면 `Boss`를 돌려준다. PILE_OF_BONES를 넘기면 `IllegalArgumentException`을 던진다 (부활 턴 계산에 탄생 턴이 필요하기 때문). 뼈 무더기는 `create(PILE_OF_BONES, pos, birth)` 또는 `createBones(pos, birth)`로 만들고, `create(type, pos, birth)`에 다른 타입을 넘기면 `IllegalArgumentException`을 던진다.
 >   `createRandom(floorLevel, pos)`는 보스를 뺀 일반 몬스터 중 minFloor ≤ floorLevel ≤ maxFloor인 종류를 무작위로 고른다.
 >   floorLevel이 1~5 밖이면 `IllegalArgumentException`을 던진다.
-> AI 규칙: 깨어 있지 않으면 대기, 플레이어가 같은 방 또는 6칸 이내면 깨어남. 깨어 있으면 인접 시 공격, 아니면 x·y 중 거리가 큰 축으로 한 칸 이동(막히면 다른 축). `speed`가 2면 2번 행동, 슬라임처럼 느린 몬스터는 짝수 턴에만 행동.
+> AI 규칙: 깨어 있지 않으면 대기, 플레이어가 같은 방 또는 6칸 이내면 깨어남. 깨어 있으면 인접 시 공격, 아니면 x·y 중 거리가 큰 축으로 한 칸 이동(막히면 다른 축). `speed`가 2면 2번 행동, 슬라임처럼 느린 몬스터는 짝수 턴에만 행동. 여러 번 행동하는 도중 플레이어가 쓰러지면 남은 행동은 하지 않는다.
 > `speed`: 0 = 짝수 턴에만 행동, 1 = 매 턴 1번, 2 = 매 턴 2번, -1 = 행동하지 않음(뼈 무더기).
 >
 > 몬스터 특수 능력:
