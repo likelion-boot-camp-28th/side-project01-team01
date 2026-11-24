@@ -368,7 +368,8 @@ public final class SaveManagerCheck {
     private static void checkRunModifiers(Path root) {
         SaveManager m = new SaveManager(root.resolve("saves"));
         Profile profile = Profile.restore(0, 1, 1, 0, 0, EnumSet.of(Job.WARRIOR),
-                Map.of(UpgradeType.BAG_SIZE, 1, UpgradeType.EXP_BOOST, 1, UpgradeType.MAX_HP, 1));
+                Map.of(UpgradeType.BAG_SIZE, 1, UpgradeType.EXP_BOOST, 1, UpgradeType.MAX_HP, 1,
+                        UpgradeType.ACCURACY, 1));
         GameContext run = sampleRun();
         Player saved = run.getPlayer();
         profile.applyRunModifiers(saved);
@@ -383,6 +384,15 @@ public final class SaveManagerCheck {
         expect("최대 HP 강화는 다시 붙지 않음", loaded.getStats().getMaxHp(), saved.getStats().getMaxHp());
         loaded.gainExp(10);
         expect("배움의 축복 +10% 유지", loaded.getExp(), 11);
+        expect("매의 눈 명중률 유지", loaded.getStats().getHitRate(), saved.getStats().getHitRate());
+        expect("매의 눈 1단계 = 전사 90 + 3", loaded.getStats().getHitRate(), 93.0);
+
+        Player rogue = new Player("도적", Job.ROGUE);
+        Profile maxAccuracy = Profile.restore(0, 0, 0, 0, 0, EnumSet.of(Job.WARRIOR, Job.ROGUE),
+                Map.of(UpgradeType.ACCURACY, UpgradeType.ACCURACY.getMaxLevel()));
+        maxAccuracy.applyTo(rogue);
+        maxAccuracy.applyRunModifiers(rogue);
+        expect("명중률은 100% 를 넘을 수 있음 (도적 95 + 9)", rogue.getStats().getHitRate(), 104.0);
     }
 
     /**

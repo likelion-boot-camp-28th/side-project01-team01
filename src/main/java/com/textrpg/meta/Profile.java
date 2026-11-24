@@ -145,7 +145,8 @@ public class Profile {
     }
 
     /**
-     * 저장되지 않는 탐험용 강화 효과를 Player 에 맞춘다: 큰 가방(BAG_SIZE) 칸 수, 배움의 축복(EXP_BOOST) 경험치 배율.
+     * 저장되지 않는 탐험용 강화 효과를 Player 에 맞춘다: 큰 가방(BAG_SIZE) 칸 수, 배움의 축복(EXP_BOOST) 경험치 배율,
+     * 매의 눈(ACCURACY) 명중률.
      * applyTo() 가 새 탐험 때 부르고, 이어하기로 Player.restore() 한 뒤에도 불러야 한다.
      * 더하는 게 아니라 맞추는 것이라 여러 번 불러도 결과가 같다.
      */
@@ -155,6 +156,12 @@ public class Profile {
 
         int expPercent = getLevel(UpgradeType.EXP_BOOST) * UpgradeType.EXP_BOOST.getValuePerLevel();
         p.setExpMultiplier(1.0 + expPercent / 100.0);
+
+        // 명중률은 세이브에 없어 직업 기본값으로 복원되므로, 더하지 않고 "기본값 + 강화" 로 맞춘다.
+        // 100% 를 넘어도 된다 (판정은 항상 명중이고, 회피는 따로 굴린다)
+        double baseHitRate = p.getJob().createBaseStats().getHitRate();
+        int hitBonus = getLevel(UpgradeType.ACCURACY) * UpgradeType.ACCURACY.getValuePerLevel();
+        p.getStats().setHitRate(baseHitRate + hitBonus);
     }
 
     /**
