@@ -497,6 +497,7 @@ classDiagram
     MonsterAI --> CombatSystem
     MonsterAI ..> MonsterFactory : create(SKELETON) 부활
     CombatSystem ..> MonsterFactory : createBones
+    CombatSystem ..> ItemFactory : createRandom 드롭
     CombatSystem ..> DamageCalculator
     CombatSystem ..> AttackResult : returns
 ```
@@ -511,6 +512,7 @@ classDiagram
 >   floorLevel이 1~5 밖이면 `IllegalArgumentException`을 던진다.
 > AI 규칙: 깨어 있지 않으면 대기, 플레이어가 같은 방 또는 6칸 이내면 깨어남. 깨어 있으면 인접 시 공격, 아니면 x·y 중 거리가 큰 축으로 한 칸 이동(막히면 다른 축). `speed`가 2면 2번 행동, 슬라임처럼 느린 몬스터는 짝수 턴에만 행동. 여러 번 행동하는 도중 플레이어가 쓰러지면 남은 행동은 하지 않는다.
 > `speed`: 0 = 짝수 턴에만 행동, 1 = 매 턴 1번, 2 = 매 턴 2번, -1 = 행동하지 않음(뼈 무더기).
+> 아이템 드롭: `rewardKill()`은 `CombatSystem.ITEM_DROP_RATE`(20)% 확률로 `ItemFactory.createRandom(floor.getLevel())`로 만든 아이템을 처치한 자리에 `FloorItem`으로 놓는다. 확률은 모든 몬스터가 같고, 드롭 아이템은 층에 따라 정해진다. 해골 병사(보상은 뼈 무더기에서)와 보스(처치 = 클리어)는 드롭하지 않는다.
 >
 > 몬스터 특수 능력:
 > - **해골 병사 → 뼈 무더기**: `CombatSystem.rewardKill()`에서 SKELETON이 처치되면 같은 자리에 `MonsterFactory.createBones(pos, ctx.getTurn())`으로 뼈 무더기(`P`)를 놓는다. 해골 병사 자체는 경험치·골드가 0이고 처치 수(파편)에도 세지 않는다. 보상(14/14)과 처치 수 1은 뼈 무더기를 부숴야 받는다. 뼈 무더기는 생성 즉시 깨어 있고, 공격·이동하지 않으며(speed -1), `PileOfBones.isTimeToRevive(turn)`이 `turn >= birth + REVIVE_DURATION(4)`이 되면 `MonsterAI.act()`가 뼈 무더기를 빼고 그 자리에 `MonsterFactory.create(SKELETON, pos)`로 HP가 가득 찬 해골 병사를 놓는다.

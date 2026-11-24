@@ -3,9 +3,13 @@ package com.textrpg.combat;
 import com.textrpg.context.GameContext;
 import com.textrpg.core.MessageLog;
 import com.textrpg.entity.Entity;
+import com.textrpg.item.FloorItem;
+import com.textrpg.item.Item;
+import com.textrpg.item.ItemFactory;
 import com.textrpg.monster.Monster;
 import com.textrpg.monster.MonsterFactory;
 import com.textrpg.monster.MonsterType;
+import com.textrpg.util.RandomUtil;
 
 /**
  * 플레이어와 몬스터가 부딪혔을 때의 공격 한 번과 처치 보상을 처리한다.
@@ -13,6 +17,8 @@ import com.textrpg.monster.MonsterType;
  * 전투 문장은 MessageLog에 남긴다.
  */
 public class CombatSystem {
+
+    private static final int ITEM_DROP_RATE = 20;
 
     /**
      * attacker가 defender를 한 번 공격한다. 명중·치명타·데미지를 판정해 defender의 HP를 깎고,
@@ -49,7 +55,7 @@ public class CombatSystem {
     }
 
     /**
-     * 처치한 몬스터의 경험치·골드를 플레이어에게 주고, 몬스터를 맵에서 제거한다.
+     * 처치한 몬스터의 경험치·골드를 플레이어에게 주고, ITEM_DROP_RATE(20)% 확률로 아이템을 드랍, 몬스터를 맵에서 제거한다.
      * 단, 처치한 몬스터가 해골 병사(SKELETON)인 경우 해골 병사가 제거된 자리에 뼈 무더기(PILE_OF_BONES)가 생성된다.
      * 추가적으로 처치한 몬스터가 해골 병사 혹은 보스일 경우 처치 보상이 없어 보상 로그를 남기지 않는다.
      * ctx.getRunResult().addKill()로 처치 수를 기록한다. (해골 병사는 제외)
@@ -75,6 +81,11 @@ public class CombatSystem {
             return;
         } else {
             ctx.getLog().add("처치 보상이 정산됩니다. +" + exp + "exp +" + gold + "gold");
+            if (RandomUtil.chance(ITEM_DROP_RATE)) {
+                Item item = ItemFactory.createRandom(ctx.getFloor().getLevel());
+                ctx.getFloor().addItem(new FloorItem(item, monster.getPos(), 0));
+                ctx.getLog().add(monster.getName() + "(이)가 " + item.getDisplayName() + "(을)를 떨어트렸습니다.");
+            }
         }
         if (isLevelUp) {
             ctx.getLog().add("레벨이 올랐습니다. (Lv." + level + ")");
