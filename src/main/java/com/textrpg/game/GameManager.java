@@ -12,6 +12,7 @@ import com.textrpg.map.DungeonGenerator;
 import com.textrpg.map.Floor;
 import com.textrpg.meta.Profile;
 import com.textrpg.meta.RunResult;
+import com.textrpg.meta.ShardCalculator;
 import com.textrpg.meta.UpgradeType;
 import com.textrpg.save.SaveLoadException;
 import com.textrpg.save.SaveManager;
@@ -355,10 +356,18 @@ public class GameManager {
      * @return SLOT_MENU
      */
     private GameState endRun(boolean victory) {
-        // TODO(A): runResult.finish(player, victory, turnSystem.getDeathCause())
-        //  → shards = ShardCalculator.calculate → profile.recordRun → saveManager.clearRun(slot, profile)
-        //  → view.printRunResult(runResult, ShardCalculator.breakdown(...)) → run = null
-        throw new UnsupportedOperationException("GameManager.endRun 은 아직 구현되지 않았습니다.");
+        RunResult result = run.getRunResult();
+        result.finish(run.getPlayer(), victory, victory ? "" : turnSystem.getDeathCause());
+        int shards = ShardCalculator.calculate(result, profile);
+        profile.recordRun(result, shards);
+        // TODO(A): SaveManager 구현 후 saveManager.clearRun(slot, profile) — 반드시 화면 출력보다 먼저
+        run = null;
+
+        view.clearScreen();
+        // TODO(A, B): ShardCalculator.breakdown 구현 후 ShardCalculator.breakdown(result, profile) 로 교체 (마지막 줄에 합계 요청)
+        view.printRunResult(result, List.of("합계 " + shards));
+        waitForEnter();
+        return GameState.SLOT_MENU;
     }
 
     /** 슬롯 메뉴 항목. 선언 순서가 화면 순서다. */

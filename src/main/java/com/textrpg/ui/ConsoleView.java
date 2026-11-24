@@ -154,8 +154,28 @@ public class ConsoleView {
      * @param shardBreakdown ShardCalculator.breakdown() 결과 (항목별 파편 내역)
      */
     public void printRunResult(RunResult result, List<String> shardBreakdown) {
-        // TODO(A): 사망/클리어 제목, 원인, 도달 층, 처치, 레벨, 골드, 파편 내역
-        throw new UnsupportedOperationException("ConsoleView.printRunResult 는 아직 구현되지 않았습니다.");
+        printTitle(formatResultTitle(result));
+        printLine(formatResultSummary(result));
+        printLine("");
+        printLine("획득 파편");
+        for (String line : shardBreakdown) {
+            printLine("  " + line);
+        }
+        printDivider();
+    }
+
+    /** 결과 화면 제목. 예: "사망 - 늑대에게 쓰러졌습니다", "클리어 - 어둠의 파수꾼을 쓰러뜨렸습니다!" */
+    static String formatResultTitle(RunResult result) {
+        if (result.isVictory()) {
+            return "클리어 - 어둠의 파수꾼을 쓰러뜨렸습니다!";
+        }
+        return "사망 - " + result.getDeathCause() + "에게 쓰러졌습니다";
+    }
+
+    /** 결과 요약 한 줄. 예: "도달 층 지하 3층  |  처치 14  |  레벨 4  |  골드 57" */
+    static String formatResultSummary(RunResult result) {
+        return "도달 층 지하 " + result.getDeepestFloor() + "층  |  처치 " + result.getKills()
+                + "  |  레벨 " + result.getFinalLevel() + "  |  골드 " + result.getGold();
     }
 
     /** 제단 한 줄. 예: "강인한 육체 - 최대 HP +5  (2/5단계, 다음 60 파편)". 최대 단계면 "완료". */

@@ -11,12 +11,13 @@ import com.textrpg.item.FloorItem;
 import com.textrpg.map.DungeonGenerator;
 import com.textrpg.map.Floor;
 import com.textrpg.map.Tile;
+import com.textrpg.meta.RunResult;
 import com.textrpg.monster.Monster;
 import com.textrpg.monster.MonsterFactory;
 import com.textrpg.monster.MonsterType;
 
 /**
- * MapRenderer 와 ConsoleView 의 문자열 생성(formatHeader, formatStatusBar) 확인용.
+ * MapRenderer 와 ConsoleView 의 문자열 생성(formatHeader, formatStatusBar, 결과 화면) 확인용.
  * JUnit 대신 main 으로 실행한다 (Team_Rules 2.11). 실패가 하나라도 있으면 종료 코드 1.
  */
 public final class MapRendererCheck {
@@ -35,6 +36,7 @@ public final class MapRendererCheck {
         checkPriority();
         checkStatusBar();
         checkHeader();
+        checkRunResult();
 
         System.out.println("통과 " + passed + " / 실패 " + failed);
         if (failed > 0) {
@@ -137,6 +139,24 @@ public final class MapRendererCheck {
 
     private static void checkHeader() {
         expect("헤더", ConsoleView.formatHeader(2, 214), " Into the Dark - 지하 2층  |  턴 214");
+    }
+
+    private static void checkRunResult() {
+        Player player = new Player("테스트", Job.WARRIOR);
+        player.addGold(57);
+
+        RunResult died = new RunResult();
+        died.reachFloor(3);
+        died.addKill();
+        died.addKill();
+        died.finish(player, false, "늑대");
+        expect("사망 제목", ConsoleView.formatResultTitle(died), "사망 - 늑대에게 쓰러졌습니다");
+        expect("결과 요약", ConsoleView.formatResultSummary(died),
+                "도달 층 지하 3층  |  처치 2  |  레벨 " + player.getLevel() + "  |  골드 57");
+
+        RunResult cleared = new RunResult();
+        cleared.finish(player, true, "");
+        expect("클리어 제목", ConsoleView.formatResultTitle(cleared), "클리어 - 어둠의 파수꾼을 쓰러뜨렸습니다!");
     }
 
     private static Player playerAtStart(Floor floor) {
