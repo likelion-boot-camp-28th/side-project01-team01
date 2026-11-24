@@ -36,7 +36,7 @@ classDiagram
 | 파트 | 담당 | 클래스 |
 |---|---|---|
 | A | 게임 루프·UI·세이브 | Main, GameManager, GameState, TurnSystem, Command, CommandParser, ConsoleView, MapRenderer, InputHandler, RandomUtil, SaveManager, SlotData, SaveFileParser, SaveFileWriter, SaveLoadException, TurnOutcome, RankingManager(P1) |
-| B | 캐릭터·아이템·영구 성장 | Entity, Player, Job, Stats, Item, Weapon, Armor, Potion, Scroll(P1), Food(P1), ItemType, ItemUser, Inventory, FloorItem, ItemFactory, ItemIdentifier(P1), Profile, UpgradeType, RunResult, ShardCalculator |
+| B | 캐릭터·아이템·영구 성장 | Entity, Player, Job, Stats, Item, ItemKind, Weapon, Armor, Potion, Scroll(P1), Food(P1), ItemType, ItemUser, Inventory, FloorItem, ItemFactory, ItemIdentifier(P1), Profile, UpgradeType, RunResult, ShardCalculator |
 | C | 몬스터·전투 | Monster, Boss, PileOfBones, MonsterType, MonsterFactory, MonsterAI, CombatSystem, DamageCalculator, AttackResult |
 | D | 맵·생성 | Floor, Tile, Room, DungeonGenerator, FieldOfView(P1), DungeonGeneratorCheck(검증용, `src/test/java`) |
 | 공통 | `core` 패키지 (수정 전 팀 공유) | Position, Direction, MessageLog |
@@ -293,19 +293,30 @@ classDiagram
     }
     class Item {
         <<abstract>>
-        -String id
-        -String name
-        -char symbol
+        -ItemKind kind
         -ItemType type
-        -String description
-        -int minFloor
-        -int maxFloor
         +getId() String
+        +getKind() ItemKind
         +getDisplayName() String
         +getSymbol() char
         +getDescription() String
         +canDropOn(int floorLevel) boolean
+        #effectText()* String
         +use(ItemUser user)* String
+    }
+    class ItemKind {
+        <<enumeration>>
+        IRON_SWORD
+        LEATHER_ARMOR
+        HP_POTION_S
+        MP_POTION_S
+        -String displayName
+        -String description
+        -int minFloor
+        -int maxFloor
+        -Function creator
+        ~create() Item
+        +canDropOn(int floorLevel) boolean
     }
     class ItemType {
         <<enumeration>>
@@ -384,7 +395,9 @@ classDiagram
     Item --> ItemType
     FloorItem --> Item
     FloorItem --> Position
-    ItemFactory ..> Item : creates
+    ItemFactory ..> ItemKind : valueOf·values
+    ItemKind ..> Item : creates
+    Item --> ItemKind
     Item ..> ItemIdentifier : displayName
 ```
 
