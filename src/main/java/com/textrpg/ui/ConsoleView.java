@@ -1,6 +1,7 @@
 package com.textrpg.ui;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 import com.textrpg.context.GameContext;
@@ -13,6 +14,7 @@ import com.textrpg.map.Floor;
 import com.textrpg.meta.Profile;
 import com.textrpg.meta.RunResult;
 import com.textrpg.meta.UpgradeType;
+import com.textrpg.monster.Monster;
 import com.textrpg.monster.MonsterType;
 
 /**
@@ -30,6 +32,10 @@ public class ConsoleView {
     /** 로그 화면(l)에 보여 줄 지난 메시지 수. */
     private static final int LOG_SCREEN_MESSAGES = 30;
     private static final String MESSAGE_PREFIX = "> ";
+    private static final String LEGEND_SEPARATOR = "  ";
+    /** 탐험 화면에 항상 보여 줄 지형·아이템 기호. 몬스터 기호는 층에 있는 종류만 덧붙인다. */
+    private static final List<String> FIXED_LEGEND = List.of(
+            "@ 나", "# 벽", ": 복도", "+ 문", "> 계단", "$ 골드", "! 물약", ") 무기", "[ 방어구");
     private static final int BAR_WIDTH = 10;
 
     private final boolean ansiClear;
@@ -72,7 +78,7 @@ public class ConsoleView {
     }
 
     /**
-     * 탐험 화면 한 장을 그린다: 화면 지우기 → 헤더(층·턴) → 맵 → 상태줄 → 구분선 → 새 메시지.
+     * 탐험 화면 한 장을 그린다: 화면 지우기 → 헤더(층·턴) → 맵 → 상태줄 → 기호 안내 → 구분선 → 새 메시지.
      * 메시지는 마지막 행동 이후에 생긴 것(MessageLog.unread)만 보여 주고, 지난 메시지는 로그 화면(l)에서 본다.
      * 명령 입력 안내는 입력을 받는 GameManager 가 출력한다.
      *
@@ -88,6 +94,9 @@ public class ConsoleView {
             printLine(line);
         }
         printStatusBar(player);
+        for (String line : formatLegend(floor.getMonsters())) {
+            printLine(line);
+        }
         printDivider();
         for (String line : formatNewMessages(ctx.getLog().unread())) {
             printLine(line);
@@ -187,6 +196,23 @@ public class ConsoleView {
             printLine("  " + line);
         }
         printDivider();
+    }
+
+    /**
+     * 탐험 화면의 기호 안내. 지형·아이템 기호는 항상, 몬스터는 이 층에 있는 종류만 보여 준다.
+     * 보스는 일반 몬스터와 헷갈리지 않게 "보스" 를 붙인다. 화면 너비를 넘으면 기호 단위로 줄을 나눈다.
+     */
+    static List<String> formatLegend(List<Monster> monsters) {
+        List<String> items = new ArrayList<>(FIXED_LEGEND);
+        monsters.stream()
+                .map(Monster::getType)
+                .distinct()
+                .sorted(Comparator.naturalOrder())
+                .map(type -> type == MonsterType.ABYSS_WARDEN
+                        ? type.getSymbol() + " 보스 " + type.getDisplayName()
+                        : type.getSymbol() + " " + type.getDisplayName())
+                .forEach(items::add);
+        return wrap(items, LEGEND_SEPARATOR, SCREEN_WIDTH, "");
     }
 
     /**

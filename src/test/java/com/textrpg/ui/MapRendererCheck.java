@@ -18,7 +18,7 @@ import com.textrpg.monster.MonsterFactory;
 import com.textrpg.monster.MonsterType;
 
 /**
- * MapRenderer 와 ConsoleView 의 문자열 생성(formatHeader, formatStatusBar, 결과 화면, 메시지 줄바꿈) 확인용.
+ * MapRenderer 와 ConsoleView 의 문자열 생성(formatHeader, formatStatusBar, 결과 화면, 기호 안내, 메시지 줄바꿈) 확인용.
  * JUnit 대신 main 으로 실행한다 (Team_Rules 2.11). 실패가 하나라도 있으면 종료 코드 1.
  */
 public final class MapRendererCheck {
@@ -38,6 +38,7 @@ public final class MapRendererCheck {
         checkStatusBar();
         checkHeader();
         checkRunResult();
+        checkLegend();
         checkMessages();
 
         System.out.println("통과 " + passed + " / 실패 " + failed);
@@ -160,6 +161,25 @@ public final class MapRendererCheck {
         RunResult cleared = new RunResult();
         cleared.finish(player, true, "");
         expect("클리어 제목", ConsoleView.formatResultTitle(cleared), "클리어 - 어둠의 파수꾼을 쓰러뜨렸습니다!");
+    }
+
+    private static void checkLegend() {
+        List<String> empty = ConsoleView.formatLegend(List.of());
+        expect("지형 기호 포함", String.join(" ", empty).contains(": 복도"), true);
+        expectWithinWidth("기호 안내", empty);
+
+        Position pos = new Position(1, 1);
+        List<Monster> monsters = List.of(
+                MonsterFactory.create(MonsterType.GOBLIN, pos),
+                MonsterFactory.create(MonsterType.SLIME, pos),
+                MonsterFactory.create(MonsterType.GOBLIN, pos),
+                MonsterFactory.createBoss(pos));
+        String joined = String.join(" ", ConsoleView.formatLegend(monsters));
+        expect("층의 몬스터 표시", joined.contains("G 고블린") && joined.contains("S 슬라임"), true);
+        expect("같은 종류는 한 번만", joined.indexOf("G 고블린") == joined.lastIndexOf("G 고블린"), true);
+        expect("보스는 따로 표시", joined.contains("& 보스 어둠의 파수꾼"), true);
+        expect("없는 몬스터는 안 보임", joined.contains("늑대"), false);
+        expectWithinWidth("몬스터 포함 기호 안내", ConsoleView.formatLegend(monsters));
     }
 
     private static void checkMessages() {
