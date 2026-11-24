@@ -15,12 +15,19 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import com.textrpg.context.GameContext;
+import com.textrpg.core.Position;
 import com.textrpg.entity.Job;
 import com.textrpg.entity.Player;
+import com.textrpg.item.FloorItem;
+import com.textrpg.item.ItemFactory;
 import com.textrpg.map.DungeonGenerator;
+import com.textrpg.map.Floor;
 import com.textrpg.meta.Profile;
 import com.textrpg.meta.RunResult;
 import com.textrpg.meta.UpgradeType;
+import com.textrpg.monster.Monster;
+import com.textrpg.monster.MonsterFactory;
+import com.textrpg.monster.MonsterType;
 
 /**
  * SaveManager 파일 입출력과 프로필 저장·불러오기(SlotCodec) 확인용. JUnit 대신 main 으로 실행한다 (Team_Rules 2.11).
@@ -50,7 +57,8 @@ public final class SaveManagerCheck {
         withTempDir(SaveManagerCheck::checkClearRun);
         withTempDir(SaveManagerCheck::checkSlotSummary);
         withTempDir(SaveManagerCheck::checkBrokenProfile);
-        checkRunNotSupportedYet();
+        withTempDir(SaveManagerCheck::checkRunEncode);
+        checkRunResultRestore();
 
         System.out.println("통과 " + passed + " / 실패 " + failed);
         if (failed > 0) {
@@ -253,11 +261,79 @@ public final class SaveManagerCheck {
         expectBroken(m, "최대 단계 초과", with(valid, "MAX_HP=1", "MAX_HP=" + (UpgradeType.MAX_HP.getMaxLevel() + 1)));
     }
 
-    private static void checkRunNotSupportedYet() {
-        Player player = new Player("테스트", Job.WARRIOR);
-        GameContext run = new GameContext(player, DungeonGenerator.createTestFloor(), new RunResult());
-        expectThrows("탐험 저장은 2단계 전까지 막음", UnsupportedOperationException.class,
-                () -> SlotCodec.encode(SlotData.withRun(Profile.newProfile(), run)));
+    private static void checkRunEncode(Path root) {
+        Player player = new Player("용사", Job.WARRIOR);
+        player.getInventory().add(ItemFactory.createById("IRON_SWORD"));
+        player.equip(player.getInventory().get(0));
+        player.getInventory().add(ItemFactory.createById("HP_POTION_S"));
+        player.addGold(15);
+        player.takeDamage(3);
+        player.setPos(new Position(4, 3));
+
+        Floor floor = DungeonGenerator.createTestFloor();
+        Monster goblin = MonsterFactory.create(MonsterType.GOBLIN, new Position(1, 1));
+        goblin.getStats().setHp(5);
+        goblin.wakeUp();
+        floor.addMonster(goblin);
+        floor.addMonster(MonsterFactory.create(MonsterType.PILE_OF_BONES, new Position(2, 1), 7));
+        floor.addItem(FloorItem.gold(15, new Position(3, 1)));
+        floor.addItem(FloorItem.of(ItemFactory.createById("LEATHER_ARMOR"), new Position(4, 1)));
+
+        RunResult result = new RunResult();
+        result.reachFloor(2);
+        result.addKill();
+        GameContext run = new GameContext(player, floor, result);
+        run.nextTurn();
+        run.nextTurn();
+        run.nextTurn();
+
+        SaveManager m = new SaveManager(root.resolve("saves"));
+        m.save(1, SlotData.withRun(sampleProfile(), run));
+        SaveFileParser p = SaveFileParser.parse(m.readLines(1));
+
+        expect("탐험 저장: 프로필도 함께", p.getInt("PROFILE", "shards"), 200);
+        expect("[RUN] turn", p.getInt("RUN", "turn"), 3);
+        expect("[RUN] kills", p.getInt("RUN", "kills"), 1);
+        expect("[RUN] deepestFloor", p.getInt("RUN", "deepestFloor"), 2);
+
+        expect("[PLAYER] name", p.getString("PLAYER", "name"), "용사");
+        expect("[PLAYER] job", p.getString("PLAYER", "job"), "WARRIOR");
+        expect("[PLAYER] gold", p.getInt("PLAYER", "gold"), 15);
+        expect("[PLAYER] hp", p.getInt("PLAYER", "hp"), player.getStats().getHp());
+        expect("[PLAYER] maxHp", p.getInt("PLAYER", "maxHp"), player.getStats().getMaxHp());
+        expect("[PLAYER] attack 는 장비 뺀 값", p.getInt("PLAYER", "attack"), player.getBaseAttack());
+        expect("[PLAYER] 위치", List.of(p.getInt("PLAYER", "x"), p.getInt("PLAYER", "y")), List.of(4, 3));
+        expect("[PLAYER] weapon", p.getString("PLAYER", "weapon"), "IRON_SWORD");
+        expect("[PLAYER] 방어구 없으면 빈 값", p.getString("PLAYER", "armor"), "");
+        expect("[INVENTORY]", p.getList("INVENTORY", "item"), List.of("HP_POTION_S"));
+
+        expect("[FLOOR] level", p.getInt("FLOOR", "level"), floor.getLevel());
+        List<String> tiles = new ArrayList<>();
+        List<String> seen = new ArrayList<>();
+        for (int y = 0; y < Floor.HEIGHT; y++) {
+            tiles.add(p.getString("FLOOR", "map" + y));
+            seen.add(p.getString("FLOOR", "seen" + y));
+        }
+        expect("[FLOOR] 타일", tiles, floor.exportTiles());
+        expect("[FLOOR] 탐험 기록", seen, floor.exportSeen());
+        expect("[FLOOR] 방", p.getList("FLOOR", "room"), floor.exportRooms());
+
+        List<String> monsters = p.getList("MONSTERS", "monster");
+        expect("[MONSTERS] 깨어난 고블린", monsters.contains("GOBLIN,1,1,5,true"), true);
+        expect("[MONSTERS] 뼈 무더기는 탄생 턴까지", monsters.contains("PILE_OF_BONES,2,1,10,true,7"), true);
+        List<String> items = p.getList("ITEMS", "item");
+        expect("[ITEMS] 골드", items.contains("GOLD:15,3,1"), true);
+        expect("[ITEMS] 아이템", items.contains("LEATHER_ARMOR,4,1"), true);
+    }
+
+    private static void checkRunResultRestore() {
+        RunResult r = RunResult.restore(3, 9);
+        expect("RunResult.restore 층", r.getDeepestFloor(), 3);
+        expect("RunResult.restore 처치", r.getKills(), 9);
+        r.reachFloor(2);
+        expect("복원 후 얕은 층은 무시", r.getDeepestFloor(), 3);
+        expectThrows("층 0", IllegalArgumentException.class, () -> RunResult.restore(0, 0));
+        expectThrows("처치 음수", IllegalArgumentException.class, () -> RunResult.restore(1, -1));
     }
 
     /** 파편 200, 탐험 6회, 최고 3층, 클리어 1, 처치 71, 마법사 해금, 강화 몇 개. */
