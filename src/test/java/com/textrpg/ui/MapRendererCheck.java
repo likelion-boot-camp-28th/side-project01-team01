@@ -139,6 +139,7 @@ public final class MapRendererCheck {
 
     private static void checkHeader() {
         expect("헤더", ConsoleView.formatHeader(2, 214), " Into the Dark - 지하 2층  |  턴 214");
+        expect("보스 기호 설명", ConsoleView.formatBossLegend(), "& 보스: 어둠의 파수꾼 (지하 5층)");
     }
 
     private static void checkRunResult() {

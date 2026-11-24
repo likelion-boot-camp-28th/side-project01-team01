@@ -11,6 +11,7 @@ import com.textrpg.map.Floor;
 import com.textrpg.meta.Profile;
 import com.textrpg.meta.RunResult;
 import com.textrpg.meta.UpgradeType;
+import com.textrpg.monster.MonsterType;
 
 /**
  * 모든 콘솔 출력의 단일 창구. 다른 클래스는 System.out 을 직접 쓰지 않는다.
@@ -123,6 +124,7 @@ public class ConsoleView {
         printDivider();
         printLine("@ 플레이어   # 벽·복도   . 바닥   + 문   > 계단");
         printLine("! 물약   ) 무기   [ 방어구   $ 골드   영문자 몬스터");
+        printLine(formatBossLegend());
     }
 
     /** 어둠의 제단: 보유 파편과 강화 목록(현재 단계 / 최대 단계 / 다음 비용). 번호는 1부터. */
@@ -176,6 +178,12 @@ public class ConsoleView {
     static String formatResultSummary(RunResult result) {
         return "도달 층 지하 " + result.getDeepestFloor() + "층  |  처치 " + result.getKills()
                 + "  |  레벨 " + result.getFinalLevel() + "  |  골드 " + result.getGold();
+    }
+
+    /** 도움말의 보스 기호 줄. 일반 몬스터(영문자)와 헷갈리지 않게 따로 보여 준다. 예: "& 보스: 어둠의 파수꾼 (지하 5층)" */
+    static String formatBossLegend() {
+        MonsterType boss = MonsterType.ABYSS_WARDEN;
+        return boss.getSymbol() + " 보스: " + boss.getDisplayName() + " (지하 " + boss.getMinFloor() + "층)";
     }
 
     /** 제단 한 줄. 예: "강인한 육체 - 최대 HP +5  (2/5단계, 다음 60 파편)". 최대 단계면 "완료". */
