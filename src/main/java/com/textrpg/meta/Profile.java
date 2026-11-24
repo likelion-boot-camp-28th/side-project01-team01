@@ -32,6 +32,40 @@ public class Profile {
         return new Profile();
     }
 
+    /**
+     * 세이브 파일([PROFILE], [UPGRADES])에서 읽은 값으로 프로필을 복원한다. SaveManager(SlotCodec) 가 호출한다.
+     * 전사는 항상 해금 상태로 둔다. 강화 맵에 없는 강화는 0단계.
+     *
+     * @throws IllegalArgumentException 음수 값이나 최대 단계를 넘는 강화가 있을 때 (SlotCodec 이 SaveLoadException 으로 감싼다)
+     */
+    public static Profile restore(int shards, int totalRuns, int bestFloor, int clears, int totalKills,
+                                  Set<Job> unlockedJobs, Map<UpgradeType, Integer> upgradeLevels) {
+        Profile p = new Profile();
+        p.shards = requireNotNegative("shards", shards);
+        p.totalRuns = requireNotNegative("totalRuns", totalRuns);
+        p.bestFloor = requireNotNegative("bestFloor", bestFloor);
+        p.clears = requireNotNegative("clears", clears);
+        p.totalKills = requireNotNegative("totalKills", totalKills);
+        p.unlockedJobs.addAll(unlockedJobs);
+        upgradeLevels.forEach((type, level) -> {
+            if (level < 0 || level > type.getMaxLevel()) {
+                throw new IllegalArgumentException(
+                        type + " 단계는 0 ~ " + type.getMaxLevel() + " 입니다: " + level);
+            }
+            if (level > 0) {
+                p.upgradeLevels.put(type, level);
+            }
+        });
+        return p;
+    }
+
+    private static int requireNotNegative(String name, int value) {
+        if (value < 0) {
+            throw new IllegalArgumentException(name + " 은(는) 0 이상입니다: " + value);
+        }
+        return value;
+    }
+
     public int getShards() {
         return shards;
     }
@@ -122,6 +156,4 @@ public class Profile {
         }
         bestFloor = Math.max(bestFloor, r.getDeepestFloor());
     }
-
-    // TODO(B, A와 합의): 세이브 파일([PROFILE], [UPGRADES])에서 값을 채우는 방법
 }

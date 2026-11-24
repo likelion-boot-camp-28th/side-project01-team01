@@ -16,6 +16,7 @@ import com.textrpg.meta.ShardCalculator;
 import com.textrpg.meta.UpgradeType;
 import com.textrpg.save.SaveLoadException;
 import com.textrpg.save.SaveManager;
+import com.textrpg.save.SlotData;
 import com.textrpg.ui.ConsoleView;
 import com.textrpg.ui.InputClosedException;
 import com.textrpg.ui.InputHandler;
@@ -90,22 +91,24 @@ public class GameManager {
                 case QUIT -> GameState.QUIT;
             };
         } catch (SaveLoadException e) {
+            // 메인 메뉴가 화면을 지우므로 안내를 읽을 수 있게 Enter 를 기다린다.
             view.printLine("세이브 파일 오류: " + e.getMessage());
+            waitForEnter();
             return GameState.MAIN_MENU;
         }
     }
 
     /**
-     * 타이틀과 슬롯 1 ~ 3 요약을 보여 주고 슬롯을 고른다. 빈 슬롯이면 새 프로필을 만들어 바로 저장한다.
+     * 타이틀과 슬롯 1 ~ 3 요약을 보여 주고 슬롯을 고른다. 세이브가 있으면 프로필을 불러오고,
+     * 빈 슬롯이면 새 프로필을 만들어 바로 저장한다. 손상된 슬롯은 새로 시작할지 묻는다.
      *
-     * @return 슬롯을 고르면 SLOT_MENU, 종료를 고르면 QUIT
+     * @return 슬롯을 고르면 SLOT_MENU, 종료를 고르면 QUIT, 손상된 슬롯을 그대로 두면 MAIN_MENU
      */
     private GameState showMainMenu() {
         view.clearScreen();
         List<String> options = new ArrayList<>();
         for (int i = 1; i <= SaveManager.SLOT_COUNT; i++) {
-            // TODO(A): SaveManager.getSlotSummary 구현 후 슬롯 요약(파편·최고 층·진행 중 탐험) 표시
-            options.add("슬롯 " + i);
+            options.add("슬롯 " + i + "  " + saveManager.getSlotSummary(i));
         }
         options.add("종료");
         view.printMenu(ConsoleView.GAME_TITLE, options);
@@ -115,9 +118,26 @@ public class GameManager {
             return GameState.QUIT;
         }
         slot = choice;
-        // TODO(A): SaveManager.load 구현 후 세이브가 있으면 프로필을 불러오고, 빈 슬롯이면 새 프로필을 바로 저장
-        profile = Profile.newProfile();
+        if (!saveManager.exists(slot)) {
+            startNewProfile();
+            return GameState.SLOT_MENU;
+        }
+        try {
+            profile = saveManager.load(slot).profile();
+        } catch (SaveLoadException e) {
+            view.printLine("세이브 파일 오류: " + e.getMessage());
+            if (!input.confirm("이 슬롯을 지우고 새로 시작할까요?")) {
+                return GameState.MAIN_MENU;
+            }
+            startNewProfile();
+        }
         return GameState.SLOT_MENU;
+    }
+
+    /** 이 슬롯을 빈 프로필로 시작하고 바로 저장한다. */
+    private void startNewProfile() {
+        profile = Profile.newProfile();
+        saveManager.save(slot, SlotData.profileOnly(profile));
     }
 
     /**
@@ -156,8 +176,7 @@ public class GameManager {
 
     /** 이 슬롯에 저장된 진행 중 탐험이 있는지. 슬롯 메뉴의 "이어하기" 표시와 새 탐험 확인에 쓴다. */
     private boolean hasSavedRun() {
-        // TODO(A): SaveManager.load 구현 후 saveManager.load(slot).hasRun() — 지금은 저장이 없어 항상 false
-        return false;
+        return saveManager.exists(slot) && saveManager.load(slot).hasRun();
     }
 
     /**
@@ -176,7 +195,7 @@ public class GameManager {
             }
             UpgradeType type = types[choice - 1];
             if (profile.buy(type)) {
-                // TODO(A): SaveManager.save 구현 후 saveManager.save(slot, SlotData.profileOnly(profile))
+                saveManager.save(slot, SlotData.profileOnly(profile));
                 view.printLine(type.getDisplayName() + " " + profile.getLevel(type) + "단계를 얻었습니다.");
             } else if (profile.getLevel(type) >= type.getMaxLevel()) {
                 view.printLine(type.getDisplayName() + " 은(는) 이미 최대 단계입니다.");
@@ -212,7 +231,7 @@ public class GameManager {
         player.setPos(first.getStartPos());
         run = new GameContext(player, first, new RunResult());
         run.getLog().add("어둠 속으로 들어왔습니다. ? 를 누르면 도움말을 볼 수 있습니다.");
-        // TODO(A): SaveManager.save 구현 후 saveManager.save(slot, SlotData.withRun(profile, run))
+        // TODO(A, 2단계): 탐험 저장(SlotCodec 탐험 섹션) 구현 후 saveManager.save(slot, SlotData.withRun(profile, run))
     }
 
     /** 캐릭터 이름을 입력받는다. 비워 두면 기본 이름, 너무 길면 다시 묻는다. */
@@ -239,7 +258,7 @@ public class GameManager {
 
     /** 세이브의 진행 중 탐험을 불러온다. */
     private void continueRun() {
-        // TODO(A): run = saveManager.load(slot).run().orElseThrow()
+        // TODO(A, 2단계): run = saveManager.load(slot).run().orElseThrow()
         throw new UnsupportedOperationException("GameManager.continueRun 은 아직 구현되지 않았습니다.");
     }
 
@@ -359,10 +378,14 @@ public class GameManager {
         run.getLog().add("지하 " + nextLevel + "층으로 내려왔습니다.");
     }
 
-    /** 저장 후 종료: 진행 중인 탐험을 그대로 저장하고 슬롯 메뉴로 돌아간다. */
+    /**
+     * 저장 후 종료: 진행 중인 탐험을 그대로 저장하고 슬롯 메뉴로 돌아간다.
+     * 탐험 저장(2단계) 전까지는 안내만 하고 탐험을 이어 간다. 프로필은 이미 저장되어 있다.
+     */
     private GameState saveAndQuit() {
-        // TODO(A): saveManager.save(slot, SlotData.withRun(profile, run)) → run = null → SLOT_MENU
-        throw new UnsupportedOperationException("GameManager.saveAndQuit 은 아직 구현되지 않았습니다.");
+        // TODO(A, 2단계): saveManager.save(slot, SlotData.withRun(profile, run)) → run = null → SLOT_MENU
+        run.getLog().add("탐험 저장은 아직 준비 중입니다. 파편·강화·기록은 자동으로 저장됩니다.");
+        return GameState.PLAYING;
     }
 
     /**
@@ -376,7 +399,8 @@ public class GameManager {
         result.finish(run.getPlayer(), victory, victory ? "" : turnSystem.getDeathCause());
         int shards = ShardCalculator.calculate(result, profile);
         profile.recordRun(result, shards);
-        // TODO(A): SaveManager 구현 후 saveManager.clearRun(slot, profile) — 반드시 화면 출력보다 먼저
+        // 결과 화면보다 먼저 저장한다. 결과 화면에서 강제 종료해도 죽음을 되돌릴 수 없다.
+        saveManager.clearRun(slot, profile);
         run = null;
 
         view.clearScreen();

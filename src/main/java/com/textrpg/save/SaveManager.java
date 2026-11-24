@@ -65,7 +65,31 @@ public class SaveManager {
         save(slot, SlotData.profileOnly(updated));
     }
 
-    // TODO(A): getSlotSummary(int slot) — 없으면 "(새 슬롯)", 손상이면 "(손상된 세이브)". 메뉴를 그릴 때 예외를 던지지 않는다
+    /**
+     * 메인 메뉴에 보여 줄 슬롯 한 줄 요약. 메뉴는 항상 그려져야 하므로 예외를 던지지 않는다.
+     * 예: "파편 85 | 최고 3층 | 탐험 6회 | 진행 중: 용사 Lv.3 전사 지하 2층"
+     *
+     * @return 파일이 없으면 "(새 슬롯)", 읽을 수 없으면 "(손상된 세이브)"
+     * @throws IllegalArgumentException 슬롯 번호가 범위를 벗어날 때
+     */
+    public String getSlotSummary(int slot) {
+        if (!exists(slot)) {
+            return "(새 슬롯)";
+        }
+        SlotData data;
+        try {
+            data = load(slot);
+        } catch (SaveLoadException e) {
+            return "(손상된 세이브)";
+        }
+        Profile p = data.profile();
+        String bestFloor = p.getBestFloor() == 0 ? "-" : p.getBestFloor() + "층";
+        String summary = "파편 " + p.getShards() + " | 최고 " + bestFloor + " | 탐험 " + p.getTotalRuns() + "회";
+        return data.run()
+                .map(run -> summary + " | 진행 중: " + run.getPlayer().getName() + " Lv." + run.getPlayer().getLevel()
+                        + " " + run.getPlayer().getJob().getDisplayName() + " 지하 " + run.getFloor().getLevel() + "층")
+                .orElse(summary);
+    }
 
     /**
      * 슬롯 번호를 파일 경로로 바꾼다. 예: 1 → saves/slot1.sav

@@ -16,6 +16,26 @@ public class RunResult {
     private String deathCause = "";
     private int turns;
 
+    /**
+     * 세이브 파일의 [RUN] 값으로 진행 중인 탐험 기록을 되살린다. SaveManager 만 쓴다.
+     *
+     * @param deepestFloor 지금까지 도달한 가장 깊은 층 (1 이상)
+     * @param kills        지금까지 처치한 몬스터 수 (0 이상)
+     * @throws IllegalArgumentException 값이 범위를 벗어날 때
+     */
+    public static RunResult restore(int deepestFloor, int kills) {
+        if (deepestFloor < 1) {
+            throw new IllegalArgumentException("deepestFloor 는 1 이상입니다: " + deepestFloor);
+        }
+        if (kills < 0) {
+            throw new IllegalArgumentException("kills 는 0 이상입니다: " + kills);
+        }
+        RunResult result = new RunResult();
+        result.deepestFloor = deepestFloor;
+        result.kills = kills;
+        return result;
+    }
+
     /** 몬스터를 처치할 때마다 C 의 CombatSystem.rewardKill() 이 ctx.getRunResult().addKill() 로 호출한다. */
     public void addKill() {
         kills++;
