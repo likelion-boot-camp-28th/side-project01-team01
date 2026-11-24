@@ -333,8 +333,15 @@ public class Floor {
      * @return HEIGHT 줄, 각 줄 WIDTH 자 (Tile 의 saveChar)
      */
     public List<String> exportTiles() {
-        // TODO(D): 줄마다 getSaveChar 이어 붙이기
-        throw new UnsupportedOperationException("Floor.exportTiles 는 아직 구현되지 않았습니다.");
+        List<String> lines = new ArrayList<>();
+        for (int y = 0; y < HEIGHT; y++) {
+            StringBuilder sb = new StringBuilder();
+            for (int x = 0; x < WIDTH; x++) {
+                sb.append(tiles[y][x].getSaveChar());
+            }
+            lines.add(sb.toString());
+        }
+        return List.copyOf(lines);
     }
 
     /**
@@ -343,8 +350,19 @@ public class Floor {
      * @return HEIGHT 줄, 각 줄 WIDTH 자 ('1' 본 칸, '0' 안 본 칸)
      */
     public List<String> exportSeen() {
-        // TODO(D): 줄마다 seen 을 '1'/'0' 으로
-        throw new UnsupportedOperationException("Floor.exportSeen 은 아직 구현되지 않았습니다.");
+        List<String> lines = new ArrayList<>();
+        for (int y = 0; y < HEIGHT; y++) {
+            StringBuilder sb = new StringBuilder();
+            for (int x = 0; x < WIDTH; x++) {
+                if (seen[y][x]) {
+                    sb.append('1');
+                } else {
+                    sb.append('0');
+                }
+            }
+            lines.add(sb.toString());
+        }
+        return List.copyOf(lines);
     }
 
     /**
@@ -353,8 +371,11 @@ public class Floor {
      * @return 방마다 Room.toSaveString() 한 줄
      */
     public List<String> exportRooms() {
-        // TODO(D): rooms 를 toSaveString 으로
-        throw new UnsupportedOperationException("Floor.exportRooms 는 아직 구현되지 않았습니다.");
+        List<String> lines = new ArrayList<>();
+        for (Room r : rooms) {
+            lines.add(r.toSaveString());
+        }
+        return List.copyOf(lines);
     }
 
     /**
