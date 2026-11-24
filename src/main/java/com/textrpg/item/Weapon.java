@@ -7,13 +7,18 @@ public class Weapon extends Item {
 
     private final int attackBonus;
 
-    public Weapon(String id, String name, String description, int minFloor, int maxFloor, int attackBonus) {
-        super(id, name, ItemType.WEAPON, description, minFloor, maxFloor);
+    Weapon(ItemKind kind, int attackBonus) {
+        super(kind, ItemType.WEAPON);
         this.attackBonus = attackBonus;
     }
 
     public int getAttackBonus() {
         return attackBonus;
+    }
+
+    @Override
+    protected String effectText() {
+        return "공격력 +" + attackBonus;
     }
 
     @Override

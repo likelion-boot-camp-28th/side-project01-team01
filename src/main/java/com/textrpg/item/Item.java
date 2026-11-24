@@ -7,70 +7,61 @@ package com.textrpg.item;
  * <p>필드는 모두 private 이므로 자식 클래스도 getter 로 읽는다.
  * 생성자만 protected 로 둔다 (private 이면 Weapon·Armor·Potion 이 super(...) 를 부를 수 없다).
  *
- * <p>드랍 층수는 MonsterType 의 minFloor/maxFloor 와 같은 방식이다.
- * minFloor 층부터 maxFloor 층까지 바닥에 놓일 수 있다.
+ * <p>이름·설명·드랍 층 같은 종류별 데이터는 ItemKind 에 있고, 여기서는 종류를 가리키기만 한다.
  */
 public abstract class Item {
 
-    /** 세이브 파일에 쓰는 고유 id. 예: "IRON_SWORD" */
-    private final String id;
-    private final String name;
-    private final char symbol;
+    /** 아이템 종류. id·이름·설명·드랍 층은 여기서 읽는다. */
+    private final ItemKind kind;
     private final ItemType type;
-    /** 아이템 설명. 가방 화면 등에서 보여 준다. 예: "평범한 철로 만든 검." */
-    private final String description;
-    /** 이 아이템이 나오기 시작하는 층 (1부터). */
-    private final int minFloor;
-    /** 이 아이템이 나오는 마지막 층. */
-    private final int maxFloor;
 
-    protected Item(String id, String name, ItemType type, String description, int minFloor, int maxFloor) {
-        if (minFloor < 1 || maxFloor < minFloor) {
-            throw new IllegalArgumentException(
-                    "드랍 층수가 잘못되었습니다: " + id + " (" + minFloor + "~" + maxFloor + ")");
-        }
-        this.id = id;
-        this.name = name;
-        this.symbol = type.getSymbol();
+    protected Item(ItemKind kind, ItemType type) {
+        this.kind = kind;
         this.type = type;
-        this.description = description;
-        this.minFloor = minFloor;
-        this.maxFloor = maxFloor;
     }
 
+    /** 세이브 파일에 쓰는 고유 id. 예: "IRON_SWORD" */
     public String getId() {
-        return id;
+        return kind.name();
+    }
+
+    public ItemKind getKind() {
+        return kind;
     }
 
     /** 화면에 보일 이름. 미확인 아이템(P1)이 생기면 ItemIdentifier 를 거친다. */
     public String getDisplayName() {
-        return name;
+        return kind.getDisplayName();
     }
 
     public char getSymbol() {
-        return symbol;
+        return type.getSymbol();
     }
 
     public ItemType getType() {
         return type;
     }
 
+    /** 가방 화면 등에서 보여 줄 설명. 종류의 설명 뒤에 실제 수치를 붙인다. 예: "평범한 철로 만든 검. 공격력 +3" */
     public String getDescription() {
-        return description;
+        return kind.getDescription() + " " + effectText();
     }
 
     public int getMinFloor() {
-        return minFloor;
+        return kind.getMinFloor();
     }
 
     public int getMaxFloor() {
-        return maxFloor;
+        return kind.getMaxFloor();
     }
 
-    /** floorLevel 층에서 나올 수 있는 아이템이면 true. ItemFactory.createRandom() 에서 쓴다. */
+    /** floorLevel 층에서 나올 수 있는 아이템이면 true. */
     public boolean canDropOn(int floorLevel) {
-        return minFloor <= floorLevel && floorLevel <= maxFloor;
+        return kind.canDropOn(floorLevel);
     }
+
+    /** 설명 뒤에 붙일 효과 수치. 예: "공격력 +3", "HP 10 회복" */
+    protected abstract String effectText();
 
     /**
      * 아이템을 사용한다. 결과 문장을 돌려주고, TurnSystem 이 MessageLog 에 넣는다.

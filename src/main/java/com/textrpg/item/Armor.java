@@ -7,13 +7,18 @@ public class Armor extends Item {
 
     private final int defenseBonus;
 
-    public Armor(String id, String name, String description, int minFloor, int maxFloor, int defenseBonus) {
-        super(id, name, ItemType.ARMOR, description, minFloor, maxFloor);
+    Armor(ItemKind kind, int defenseBonus) {
+        super(kind, ItemType.ARMOR);
         this.defenseBonus = defenseBonus;
     }
 
     public int getDefenseBonus() {
         return defenseBonus;
+    }
+
+    @Override
+    protected String effectText() {
+        return "방어력 +" + defenseBonus;
     }
 
     @Override
