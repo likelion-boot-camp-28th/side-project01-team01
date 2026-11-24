@@ -62,8 +62,10 @@ public class CombatSystem {
         }
         int exp = monster.getExpReward();
         int gold = monster.getGoldReward();
-        ctx.getPlayer().gainExp(exp);
+        int preLevel = ctx.getPlayer().getLevel();
+        boolean isLevelUp = ctx.getPlayer().gainExp(exp);
         ctx.getPlayer().addGold(gold);
+        int postLevel = ctx.getPlayer().getLevel();
 
         ctx.getFloor().removeMonster(monster);
         if (monster.getType() == MonsterType.SKELETON) {
@@ -71,6 +73,9 @@ public class CombatSystem {
             ctx.getLog().add("해골 병사가 사망하여 뼈 무더기가 되었습니다. 얼마 후에 해골 병사로 부활합니다. 그전에 처치하세요.");
         } else {
             ctx.getLog().add("처치 보상이 정산됩니다. +" + exp + "exp +" + gold + "gold");
+        }
+        if (isLevelUp) {
+            ctx.getLog().add("레벨업했습니다. +" + (postLevel - preLevel));
         }
     }
 }
