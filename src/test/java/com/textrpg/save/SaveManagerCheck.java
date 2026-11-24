@@ -5,14 +5,25 @@ import java.nio.charset.CharacterCodingException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import com.textrpg.context.GameContext;
+import com.textrpg.entity.Job;
+import com.textrpg.entity.Player;
+import com.textrpg.map.DungeonGenerator;
+import com.textrpg.meta.Profile;
+import com.textrpg.meta.RunResult;
+import com.textrpg.meta.UpgradeType;
+
 /**
- * SaveManager 파일 입출력 확인용. JUnit 대신 main 으로 실행한다 (Team_Rules 2.11).
+ * SaveManager 파일 입출력과 프로필 저장·불러오기(SlotCodec) 확인용. JUnit 대신 main 으로 실행한다 (Team_Rules 2.11).
  * 실패가 하나라도 있으면 종료 코드 1.
  *
  * <p>케이스마다 임시 폴더를 새로 만들고 끝나면 지운다. 실제 saves 폴더는 건드리지 않는다.
@@ -35,6 +46,11 @@ public final class SaveManagerCheck {
         withTempDir(SaveManagerCheck::checkReadFailures);
         withTempDir(SaveManagerCheck::checkWriteFailures);
         withTempDir(SaveManagerCheck::checkWithParserAndWriter);
+        withTempDir(SaveManagerCheck::checkProfileRoundTrip);
+        withTempDir(SaveManagerCheck::checkClearRun);
+        withTempDir(SaveManagerCheck::checkSlotSummary);
+        withTempDir(SaveManagerCheck::checkBrokenProfile);
+        checkRunNotSupportedYet();
 
         System.out.println("통과 " + passed + " / 실패 " + failed);
         if (failed > 0) {
@@ -173,6 +189,116 @@ public final class SaveManagerCheck {
         try (Stream<Path> files = Files.list(dir)) {
             return files.map(f -> f.getFileName().toString()).sorted().collect(Collectors.toList());
         }
+    }
+
+    private static void checkProfileRoundTrip(Path root) {
+        SaveManager m = new SaveManager(root.resolve("saves"));
+        Profile saved = sampleProfile();
+        m.save(1, SlotData.profileOnly(saved));
+
+        SlotData loaded = m.load(1);
+        expect("불러온 슬롯에 탐험 없음", loaded.hasRun(), false);
+        expectSameProfile("저장 → 불러오기", loaded.profile(), saved);
+
+        Profile played = Profile.newProfile();
+        RunResult run = new RunResult();
+        run.reachFloor(2);
+        run.addKill();
+        played.recordRun(run, 50);
+        played.buy(UpgradeType.MAX_HP);
+        m.save(2, SlotData.profileOnly(played));
+        expectSameProfile("플레이 후 프로필", m.load(2).profile(), played);
+        expectSameProfile("새 프로필", roundTrip(m, Profile.newProfile()), Profile.newProfile());
+    }
+
+    private static void checkClearRun(Path root) {
+        SaveManager m = new SaveManager(root.resolve("saves"));
+        Profile p = sampleProfile();
+        m.clearRun(1, p);
+        expect("clearRun 후 탐험 없음", m.load(1).hasRun(), false);
+        expectSameProfile("clearRun 은 프로필을 저장", m.load(1).profile(), p);
+    }
+
+    private static void checkSlotSummary(Path root) {
+        SaveManager m = new SaveManager(root.resolve("saves"));
+        expect("빈 슬롯 요약", m.getSlotSummary(1), "(새 슬롯)");
+
+        m.save(1, SlotData.profileOnly(sampleProfile()));
+        expect("프로필 요약", m.getSlotSummary(1), "파편 200 | 최고 3층 | 탐험 6회");
+        m.save(2, SlotData.profileOnly(Profile.newProfile()));
+        expect("최고 층 없음", m.getSlotSummary(2), "파편 0 | 최고 - | 탐험 0회");
+
+        m.writeLines(3, List.of("[META]", "version=99"));
+        expect("손상된 세이브 요약", m.getSlotSummary(3), "(손상된 세이브)");
+    }
+
+    private static void checkBrokenProfile(Path root) {
+        SaveManager m = new SaveManager(root.resolve("saves"));
+        List<String> valid = List.of("[META]", "version=1", "[PROFILE]", "shards=10", "totalRuns=1",
+                "bestFloor=1", "clears=0", "totalKills=2", "unlockedJobs=WARRIOR", "[UPGRADES]", "MAX_HP=1");
+        m.writeLines(1, valid);
+        expect("직접 쓴 파일 읽기", m.load(1).profile().getLevel(UpgradeType.MAX_HP), 1);
+
+        m.writeLines(1, with(valid, "MAX_HP=1", "FUTURE_UPGRADE=3"));
+        expect("모르는 강화 id 는 무시", m.load(1).profile().getShards(), 10);
+        m.writeLines(1, with(valid, "MAX_HP=1", "# 강화 없음"));
+        expect("없는 강화는 0단계", m.load(1).profile().getLevel(UpgradeType.MAX_HP), 0);
+
+        expectBroken(m, "버전 불일치", with(valid, "version=1", "version=2"));
+        expectBroken(m, "META 없음", valid.subList(2, valid.size()));
+        expectBroken(m, "필수 key 없음", with(valid, "shards=10", "# shards 없음"));
+        expectBroken(m, "숫자가 아님", with(valid, "shards=10", "shards=많음"));
+        expectBroken(m, "음수", with(valid, "shards=10", "shards=-1"));
+        expectBroken(m, "모르는 직업", with(valid, "unlockedJobs=WARRIOR", "unlockedJobs=WARRIOR,KNIGHT"));
+        expectBroken(m, "최대 단계 초과", with(valid, "MAX_HP=1", "MAX_HP=" + (UpgradeType.MAX_HP.getMaxLevel() + 1)));
+    }
+
+    private static void checkRunNotSupportedYet() {
+        Player player = new Player("테스트", Job.WARRIOR);
+        GameContext run = new GameContext(player, DungeonGenerator.createTestFloor(), new RunResult());
+        expectThrows("탐험 저장은 2단계 전까지 막음", UnsupportedOperationException.class,
+                () -> SlotCodec.encode(SlotData.withRun(Profile.newProfile(), run)));
+    }
+
+    /** 파편 200, 탐험 6회, 최고 3층, 클리어 1, 처치 71, 마법사 해금, 강화 몇 개. */
+    private static Profile sampleProfile() {
+        return Profile.restore(200, 6, 3, 1, 71, EnumSet.of(Job.WARRIOR, Job.MAGE),
+                Map.of(UpgradeType.MAX_HP, 2, UpgradeType.ATTACK, 1, UpgradeType.UNLOCK_MAGE, 1));
+    }
+
+    private static Profile roundTrip(SaveManager m, Profile p) {
+        m.save(3, SlotData.profileOnly(p));
+        return m.load(3).profile();
+    }
+
+    private static void expectSameProfile(String name, Profile actual, Profile expected) {
+        expect(name + " 파편", actual.getShards(), expected.getShards());
+        expect(name + " 탐험 수", actual.getTotalRuns(), expected.getTotalRuns());
+        expect(name + " 최고 층", actual.getBestFloor(), expected.getBestFloor());
+        expect(name + " 클리어", actual.getClears(), expected.getClears());
+        expect(name + " 누적 처치", actual.getTotalKills(), expected.getTotalKills());
+        for (Job job : Job.values()) {
+            expect(name + " 해금 " + job, actual.isUnlocked(job), expected.isUnlocked(job));
+        }
+        for (UpgradeType t : UpgradeType.values()) {
+            expect(name + " 강화 " + t, actual.getLevel(t), expected.getLevel(t));
+        }
+    }
+
+    private static void expectBroken(SaveManager m, String name, List<String> lines) {
+        m.writeLines(1, lines);
+        expectThrows(name, SaveLoadException.class, () -> m.load(1));
+    }
+
+    /** lines 에서 target 줄 하나를 replacement 로 바꾼 사본. */
+    private static List<String> with(List<String> lines, String target, String replacement) {
+        List<String> copy = new ArrayList<>(lines);
+        int index = copy.indexOf(target);
+        if (index < 0) {
+            throw new IllegalArgumentException("바꿀 줄이 없습니다: " + target);
+        }
+        copy.set(index, replacement);
+        return copy;
     }
 
     private static void expect(String name, Object actual, Object expected) {
