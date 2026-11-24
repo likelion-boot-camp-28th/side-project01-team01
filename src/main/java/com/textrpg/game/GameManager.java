@@ -225,7 +225,7 @@ public class GameManager {
         String name = readPlayerName();
         Job job = chooseJob();
         Player player = new Player(name, job);
-        // TODO(A, B): Profile.applyTo 구현 후 profile.applyTo(player) 호출 (영구 강화 적용)
+        profile.applyTo(player);
 
         Floor first = DungeonGenerator.generate(1);
         player.setPos(first.getStartPos());
