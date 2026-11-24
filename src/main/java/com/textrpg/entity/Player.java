@@ -6,6 +6,7 @@ import com.textrpg.core.Position;
 import com.textrpg.item.Armor;
 import com.textrpg.item.Inventory;
 import com.textrpg.item.Item;
+import com.textrpg.item.ItemFactory;
 import com.textrpg.item.ItemUser;
 import com.textrpg.item.Weapon;
 
@@ -129,6 +130,16 @@ public class Player extends Entity implements ItemUser {
 
     public void addGold(int amount) {
         gold += Math.max(0, amount);
+    }
+
+    /**
+     * 시작 보급품: 치유 물약 count 개를 가방에 넣는다 (영구 강화 START_POTION).
+     * meta 패키지는 item 을 import 할 수 없어서(패키지 의존 방향) Profile.applyTo() 가 이 메서드를 부른다.
+     */
+    public void giveStartPotions(int count) {
+        for (int i = 0; i < count; i++) {
+            inventory.add(ItemFactory.createById("HP_POTION_S"));
+        }
     }
 
     public void setExpMultiplier(double expMultiplier) {

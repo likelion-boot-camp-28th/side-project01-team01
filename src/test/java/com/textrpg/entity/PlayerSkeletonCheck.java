@@ -43,6 +43,7 @@ public final class PlayerSkeletonCheck {
         checkDropItem();
         checkUseItem();
         checkEquip();
+        checkStartPotionAndMpPotion();
 
         System.out.println("통과 " + passed + " / 실패 " + failed);
         if (failed > 0) {
@@ -315,8 +316,8 @@ public final class PlayerSkeletonCheck {
             }
         }
         check("무작위 아이템은 항상 그 층에서 나올 수 있는 것", allFitFloor);
-        check("1층에서는 3종 모두 나옴", seenOnFloor1.size() == 3);
-        check("5층에서는 물약만 (검·갑옷은 1~3층)", seenOnFloor5.equals(java.util.Set.of("HP_POTION_S")));
+        check("1층에서는 4종 모두 나옴", seenOnFloor1.size() == 4);
+        check("5층에서는 물약만 (검·갑옷은 1~3층)", seenOnFloor5.equals(java.util.Set.of("HP_POTION_S", "MP_POTION_S")));
         Item a = ItemFactory.createRandom(1);
         Item b = ItemFactory.createRandom(1);
         check("부를 때마다 새 아이템 객체", a != b);
@@ -389,6 +390,32 @@ public final class PlayerSkeletonCheck {
 
         String refuse = p.equip(potion);
         check("물약은 장착할 수 없음", refuse.contains("장착할 수 없다"));
+    }
+
+
+    private static void checkStartPotionAndMpPotion() {
+        Player none = new Player("용사", Job.WARRIOR);
+        Profile.newProfile().applyTo(none);
+        check("보급품 강화 없으면 시작 물약 0개", none.getInventory().size() == 0);
+
+        Profile profile = Profile.newProfile();
+        profile.recordRun(new RunResult(), 75);
+        profile.buy(UpgradeType.START_POTION);
+        profile.buy(UpgradeType.START_POTION);
+        Player p = new Player("용사", Job.WARRIOR);
+        profile.applyTo(p);
+        check("보급품 2단계 -> 시작 물약 2개", p.getInventory().size() == 2
+                && p.getInventory().get(0).getId().equals("HP_POTION_S")
+                && p.getInventory().get(1).getId().equals("HP_POTION_S"));
+        check("시작 물약은 서로 다른 객체", p.getInventory().get(0) != p.getInventory().get(1));
+
+        Player mage = new Player("마법사", Job.MAGE);
+        mage.getStats().setMp(0);
+        mage.getInventory().add(ItemFactory.createById("MP_POTION_S"));
+        String message = mage.useItem(0);
+        check("마나 물약: MP 0 -> 5", mage.getStats().getMp() == 5);
+        check("마나 물약 문장에 MP 5", message.contains("MP 를 5"));
+        check("마신 마나 물약은 가방에서 사라짐", mage.getInventory().size() == 0);
     }
 
 

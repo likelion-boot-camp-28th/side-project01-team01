@@ -104,7 +104,9 @@ public class Profile {
         int defenseBonus = getLevel(UpgradeType.DEFENSE) * UpgradeType.DEFENSE.getValuePerLevel();
         stats.setDefense(stats.getDefense() + defenseBonus);
 
-        // TODO(B): START_POTION → 치유 물약 지급 (가방 작업 때)
+        int potionCount = getLevel(UpgradeType.START_POTION) * UpgradeType.START_POTION.getValuePerLevel();
+        p.giveStartPotions(potionCount);
+
         // TODO(B): BAG_SIZE → 가방 칸 증가(P1), EXP_BOOST → p.setExpMultiplier(P1)
     }
 
