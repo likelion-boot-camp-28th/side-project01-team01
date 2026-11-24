@@ -3,6 +3,7 @@ package com.textrpg.map;
 import com.textrpg.core.Direction;
 import com.textrpg.core.Position;
 import com.textrpg.item.FloorItem;
+import com.textrpg.item.ItemFactory;
 import com.textrpg.monster.Boss;
 import com.textrpg.monster.Monster;
 import com.textrpg.monster.MonsterFactory;
@@ -136,7 +137,7 @@ public final class DungeonGenerator {
         placeStartAndGoal(f);
         placeMonsters(f);
         placeGold(f);
-        // TODO(D): B 의 ItemFactory.createRandom 구현 후 placeItems 호출
+        placeItems(f);
         if (!isReachable(f, f.getStartPos(), findGoal(f))) {
             return Optional.empty();
         }
@@ -301,8 +302,12 @@ public final class DungeonGenerator {
      * 시작 방을 뺀 방들에 아이템 MIN_ITEMS ~ MAX_ITEMS 개.
      */
     private static void placeItems(Floor f) {
-        // TODO(D): ItemFactory.createRandom(level) → addItem (B 의 ItemFactory 필요)
-        throw new UnsupportedOperationException("DungeonGenerator.placeItems 는 아직 구현되지 않았습니다.");
+        int itemCount = RandomUtil.nextInt(MIN_ITEMS, MAX_ITEMS);
+        for (int i = 0; i < itemCount; i++) {
+            Position p = randomPositionOutsideStartRoom(f);
+            FloorItem floorItem = FloorItem.of(ItemFactory.createRandom(f.getLevel()), p);
+            f.addItem(floorItem);
+        }
     }
 
     /**
