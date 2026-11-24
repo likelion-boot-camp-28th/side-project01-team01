@@ -2,14 +2,14 @@ package com.textrpg.map;
 
 /**
  * 맵의 한 칸. displayChar 는 화면 출력용, saveChar 는 세이브 파일 기록용 문자다.
- * (벽과 복도가 화면에서는 둘 다 '#' 이라서 저장용 문자를 따로 둔다.)
- * ROCK 은 방 바깥의 빈 공간이다. 화면에서는 공백으로 보여 복도('#')와 구분된다.
+ * 화면에서는 벽('#')과 복도(':')를 다른 문자로 그린다. 세이브 문자는 기존 형식(벽 'W', 복도 '#')을 유지한다.
+ * ROCK 은 방 바깥의 빈 공간이다. 화면에서는 공백으로 보인다.
  */
 public enum Tile {
     ROCK(' ', 'R', false),
     WALL('#', 'W', false),
     FLOOR('.', '.', true),
-    CORRIDOR('#', '#', true),
+    CORRIDOR(':', '#', true),
     DOOR('+', '+', true),
     STAIRS_DOWN('>', '>', true);
 

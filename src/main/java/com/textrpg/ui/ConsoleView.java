@@ -122,7 +122,7 @@ public class ConsoleView {
         printLine("?         도움말");
         printLine("명령은 대소문자를 구분하지 않습니다.");
         printDivider();
-        printLine("@ 플레이어   # 벽·복도   . 바닥   + 문   > 계단");
+        printLine("@ 플레이어   # 벽   : 복도   . 바닥   + 문   > 계단");
         printLine("! 물약   ) 무기   [ 방어구   $ 골드   영문자 몬스터");
         printLine(formatBossLegend());
     }
