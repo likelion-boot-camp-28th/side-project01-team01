@@ -38,6 +38,8 @@ public class Player extends Entity implements ItemUser {
     private int hunger = MAX_HUNGER;
     private Weapon weapon;
     private Armor armor;
+    private boolean poisoned;
+    private int poisonedTurn;
     private final Inventory inventory = new Inventory();
     /**
      * 경험치 배율. 영구 강화(배움의 축복, P1)에 따라 Profile.applyRunModifiers() 에서 바꾼다.
@@ -192,6 +194,10 @@ public class Player extends Entity implements ItemUser {
         return Optional.ofNullable(armor);
     }
 
+    public boolean isPoisoned() {
+        return poisoned;
+    }
+
     @Override
     public Inventory getInventory() {
         return inventory;
@@ -324,5 +330,35 @@ public class Player extends Entity implements ItemUser {
         if (turn % REGEN_INTERVAL == 0) {
             heal(1);
         }
+    }
+
+    /**
+     * 독거미에게 공격을 명중당하면 중독된다.
+     *
+     * @param turn 현재 턴
+     * @return 중독 상태가 아니었다가 중독된거면 true
+     */
+    public boolean poison(int turn) {
+        poisonedTurn = turn;
+        if (!poisoned) {
+            poisoned = true;
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * 중독된 상태일 때 독의 지속시간이 지났다면 중독 상태가 해제된다.
+     *
+     * @param turn 현재 턴
+     * @param poisonDuration 독의 지속시간
+     * @return 중독 상태였다가 중독 상태가 해제되었다면 true
+     */
+    public boolean detox(int turn, int poisonDuration) {
+        if (poisoned && turn > poisonedTurn + poisonDuration) {
+            poisoned = false;
+            return true;
+        }
+        return false;
     }
 }

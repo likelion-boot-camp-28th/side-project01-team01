@@ -54,10 +54,10 @@ public class MonsterAI {
                 if (!player.isAlive()) {
                     return;
                 }
-                moveOrAttack(monster, player, floor, log);
+                moveOrAttack(monster, player, floor, log, ctx.getTurn());
             }
             if (ctx.getTurn() % ZERO_SPEED_ACTION_INTERVAL == 0 && monster.getType().getSpeed() == 0) {
-                moveOrAttack(monster, player, floor, log);
+                moveOrAttack(monster, player, floor, log, ctx.getTurn());
             }
             if (monster instanceof PileOfBones bones) {
                 revive(bones, ctx);
@@ -65,9 +65,14 @@ public class MonsterAI {
         }
     }
 
-    private void moveOrAttack(Monster monster, Player player, Floor floor, MessageLog log) {
+    private void moveOrAttack(Monster monster, Player player, Floor floor, MessageLog log, int turn) {
         if (monster.getPos().isAdjacent(player.getPos())) {
-            combat.attack(monster, player, log);
+            AttackResult attackResult = combat.attack(monster, player, log);
+            if (attackResult.hit() && monster.getType() == MonsterType.SPIDER) {
+                if (player.poison(turn)) {
+                    log.add(player.getName() + "(이)가 " + monster.getName() + "의 공격에 명중되어 중독되었습니다.");
+                }
+            }
             return;
         }
         if (monster.getType() == MonsterType.BAT) {
