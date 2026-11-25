@@ -12,6 +12,7 @@ import com.textrpg.item.FloorItem;
 import com.textrpg.item.Inventory;
 import com.textrpg.item.Item;
 import com.textrpg.item.ItemType;
+import com.textrpg.map.FieldOfView;
 import com.textrpg.map.Floor;
 import com.textrpg.monster.Boss;
 import com.textrpg.monster.Monster;
@@ -108,6 +109,8 @@ public class TurnSystem {
             return TurnOutcome.NO_TURN;
         }
         player.setPos(next);
+        // 연속 이동(dddd) 중에 지나친 칸도 지도에 남도록 한 칸 움직일 때마다 시야를 갱신한다.
+        FieldOfView.update(floor, next);
         FloorItem floorItem = floor.getItemAt(next);
         if (floorItem != null) {
             take(floorItem, ctx);

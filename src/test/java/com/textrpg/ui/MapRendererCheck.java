@@ -10,6 +10,7 @@ import com.textrpg.entity.Job;
 import com.textrpg.entity.Player;
 import com.textrpg.item.FloorItem;
 import com.textrpg.map.DungeonGenerator;
+import com.textrpg.map.FieldOfView;
 import com.textrpg.map.Floor;
 import com.textrpg.map.Tile;
 import com.textrpg.meta.RunResult;
@@ -18,7 +19,7 @@ import com.textrpg.monster.MonsterFactory;
 import com.textrpg.monster.MonsterType;
 
 /**
- * MapRenderer 와 ConsoleView 의 문자열 생성(formatHeader, formatStatusBar, 결과 화면, 기호 안내, 메시지 줄바꿈) 확인용.
+ * MapRenderer(시야 포함)와 ConsoleView 의 문자열 생성(formatHeader, formatStatusBar, 결과 화면, 기호 안내, 메시지 줄바꿈) 확인용.
  * JUnit 대신 main 으로 실행한다 (Team_Rules 2.11). 실패가 하나라도 있으면 종료 코드 1.
  */
 public final class MapRendererCheck {
@@ -35,6 +36,7 @@ public final class MapRendererCheck {
         checkPlayer();
         checkMonsterAndItem();
         checkPriority();
+        checkFieldOfView();
         checkStatusBar();
         checkHeader();
         checkRunResult();
@@ -48,7 +50,7 @@ public final class MapRendererCheck {
     }
 
     private static void checkSize() {
-        Floor floor = DungeonGenerator.createTestFloor();
+        Floor floor = visibleTestFloor();
         List<String> lines = new MapRenderer().render(floor, playerAtStart(floor));
 
         expect("줄 수", lines.size(), Floor.HEIGHT);
@@ -60,7 +62,7 @@ public final class MapRendererCheck {
 
     /** 아무것도 없는 칸은 타일 기호를 그대로 찍는다. */
     private static void checkTiles() {
-        Floor floor = DungeonGenerator.createTestFloor();
+        Floor floor = visibleTestFloor();
         Player player = playerAtStart(floor);
         List<String> lines = new MapRenderer().render(floor, player);
 
@@ -85,7 +87,7 @@ public final class MapRendererCheck {
     }
 
     private static void checkPlayer() {
-        Floor floor = DungeonGenerator.createTestFloor();
+        Floor floor = visibleTestFloor();
         Player player = playerAtStart(floor);
         List<String> lines = new MapRenderer().render(floor, player);
 
@@ -94,7 +96,7 @@ public final class MapRendererCheck {
     }
 
     private static void checkMonsterAndItem() {
-        Floor floor = DungeonGenerator.createTestFloor();
+        Floor floor = visibleTestFloor();
         Player player = playerAtStart(floor);
         List<Position> free = freeFloorPositions(floor, player, 2);
         Monster goblin = MonsterFactory.create(MonsterType.GOBLIN, free.get(0));
@@ -108,7 +110,7 @@ public final class MapRendererCheck {
 
     /** 겹친 칸: 플레이어 > 몬스터 > 바닥 아이템 > 타일. */
     private static void checkPriority() {
-        Floor floor = DungeonGenerator.createTestFloor();
+        Floor floor = visibleTestFloor();
         Player player = playerAtStart(floor);
         Position underPlayer = player.getPos();
         Position shared = freeFloorPositions(floor, player, 1).get(0);
@@ -121,6 +123,47 @@ public final class MapRendererCheck {
         List<String> lines = new MapRenderer().render(floor, player);
         expect("플레이어 + 아이템 → @", charAt(lines, underPlayer), Player.SYMBOL);
         expect("몬스터 + 아이템 → 몬스터", charAt(lines, shared), goblin.getSymbol());
+    }
+
+    /** 안 본 칸은 공백, 본 적 있지만 안 보이는 칸은 타일만(몬스터·아이템 숨김), 보이는 칸은 전부. */
+    private static void checkFieldOfView() {
+        Floor floor = DungeonGenerator.createTestFloor();
+        Player player = playerAtStart(floor);
+        List<Position> free = freeFloorPositions(floor, player, 2);
+        Position monsterPos = free.get(0);
+        Position itemPos = free.get(1);
+        Monster goblin = MonsterFactory.create(MonsterType.GOBLIN, monsterPos);
+        floor.addMonster(goblin);
+        floor.addItem(FloorItem.gold(10, itemPos));
+        MapRenderer renderer = new MapRenderer();
+
+        List<String> unseen = renderer.render(floor, player);
+        expect("안 본 칸은 공백", charAt(unseen, monsterPos), ' ');
+        expect("아무것도 안 봤으면 @ 만 보임", countNonBlank(unseen), 1);
+
+        floor.markSeen(monsterPos.x(), monsterPos.y());
+        floor.markSeen(itemPos.x(), itemPos.y());
+        List<String> remembered = renderer.render(floor, player);
+        expect("본 적 있는 칸의 몬스터는 숨김", charAt(remembered, monsterPos), Tile.FLOOR.getDisplayChar());
+        expect("본 적 있는 칸의 아이템은 숨김", charAt(remembered, itemPos), Tile.FLOOR.getDisplayChar());
+
+        floor.setVisible(monsterPos.x(), monsterPos.y());
+        floor.setVisible(itemPos.x(), itemPos.y());
+        List<String> visible = renderer.render(floor, player);
+        expect("보이는 칸의 몬스터", charAt(visible, monsterPos), goblin.getSymbol());
+        expect("보이는 칸의 아이템", charAt(visible, itemPos), '$');
+
+        floor.clearVisible();
+        List<String> cleared = renderer.render(floor, player);
+        expect("시야를 벗어나면 다시 숨김", charAt(cleared, monsterPos), Tile.FLOOR.getDisplayChar());
+
+        Floor fresh = DungeonGenerator.createTestFloor();
+        Player walker = playerAtStart(fresh);
+        FieldOfView.update(fresh, walker.getPos());
+        List<String> start = renderer.render(fresh, walker);
+        expect("시작 위치 주변은 보임", countNonBlank(start) > 1, true);
+        expect("시작할 때 층 전체가 보이지는 않음",
+                countNonBlank(start) < countNonBlank(renderer.render(visibleTestFloor(), walker)), true);
     }
 
     private static void checkStatusBar() {
@@ -211,6 +254,25 @@ public final class MapRendererCheck {
         for (String line : lines) {
             expect(name + " 너비 60 이하: " + line, ConsoleView.displayWidth(line) <= ConsoleView.SCREEN_WIDTH, true);
         }
+    }
+
+    /** 시야와 상관없이 그리기를 확인할 때 쓰는, 모든 칸이 보이는 테스트 층. */
+    private static Floor visibleTestFloor() {
+        Floor floor = DungeonGenerator.createTestFloor();
+        for (int y = 0; y < Floor.HEIGHT; y++) {
+            for (int x = 0; x < Floor.WIDTH; x++) {
+                floor.setVisible(x, y);
+            }
+        }
+        return floor;
+    }
+
+    private static int countNonBlank(List<String> lines) {
+        int count = 0;
+        for (String line : lines) {
+            count += (int) line.chars().filter(ch -> ch != ' ').count();
+        }
+        return count;
     }
 
     private static Player playerAtStart(Floor floor) {

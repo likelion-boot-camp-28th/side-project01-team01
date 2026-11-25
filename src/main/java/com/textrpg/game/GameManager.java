@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -13,11 +14,13 @@ import com.textrpg.core.Position;
 import com.textrpg.entity.Job;
 import com.textrpg.entity.Player;
 import com.textrpg.map.DungeonGenerator;
+import com.textrpg.map.FieldOfView;
 import com.textrpg.map.Floor;
 import com.textrpg.meta.Profile;
 import com.textrpg.meta.RunResult;
 import com.textrpg.meta.ShardCalculator;
 import com.textrpg.meta.UpgradeType;
+import com.textrpg.monster.Monster;
 import com.textrpg.save.CorruptedRunException;
 import com.textrpg.save.SaveLoadException;
 import com.textrpg.save.SaveManager;
@@ -274,6 +277,7 @@ public class GameManager {
         // --start-floor=N 이면 그 층에서 시작한다. 보통은 1층
         Floor first = DungeonGenerator.generate(debug.startFloor());
         player.setPos(first.getStartPos());
+        FieldOfView.update(first, player.getPos());
         RunResult result = new RunResult();
         result.reachFloor(first.getLevel());
         run = new GameContext(player, first, result);
@@ -307,6 +311,8 @@ public class GameManager {
     private void continueRun() {
         run = saveManager.load(slot).run()
                 .orElseThrow(() -> new IllegalStateException("이어할 탐험이 없습니다: 슬롯 " + slot));
+        // 세이브에는 본 칸(seen)만 있고 지금 보이는 칸은 없으므로 다시 계산한다.
+        FieldOfView.update(run.getFloor(), run.getPlayer().getPos());
         run.getLog().add("지난 탐험을 이어 갑니다. 지하 " + run.getFloor().getLevel() + "층");
     }
 
@@ -376,6 +382,7 @@ public class GameManager {
                 }
                 default -> {
                     int hpBefore = run.getPlayer().getStats().getHp();
+                    Set<Monster> seenBefore = visibleMonsters();
                     TurnOutcome outcome = turnSystem.playTurn(cmd, run);
                     if (outcome == TurnOutcome.DIED) {
                         return GameState.DEAD;
@@ -387,7 +394,7 @@ public class GameManager {
                         descend();
                         return GameState.PLAYING;
                     }
-                    if (outcome == TurnOutcome.NO_TURN || isInterrupted(hpBefore)) {
+                    if (outcome == TurnOutcome.NO_TURN || isInterrupted(hpBefore, seenBefore)) {
                         return GameState.PLAYING;
                     }
                 }
@@ -398,15 +405,33 @@ public class GameManager {
 
     /**
      * 연속 이동을 멈춰야 하는지 (기획서: 몬스터 발견 시 중단).
-     * 시야(P1)가 없으므로 이번 턴에 피해를 입었거나 몬스터가 바로 옆에 있으면 멈춘다.
+     * 이번 턴에 피해를 입었거나, 전에 안 보이던 몬스터가 보이게 됐거나, 몬스터가 바로 옆에 있으면 멈춘다.
+     *
+     * @param hpBefore   이번 턴 전 HP
+     * @param seenBefore 이번 턴 전에 보이던 몬스터
      */
-    private boolean isInterrupted(int hpBefore) {
+    private boolean isInterrupted(int hpBefore, Set<Monster> seenBefore) {
         Player player = run.getPlayer();
         if (player.getStats().getHp() < hpBefore) {
             return true;
         }
+        if (!seenBefore.containsAll(visibleMonsters())) {
+            return true;
+        }
         Position pos = player.getPos();
         return run.getFloor().getMonsters().stream().anyMatch(m -> m.getPos().isAdjacent(pos));
+    }
+
+    /** 지금 시야 안에 있는 몬스터. 같은 몬스터인지는 객체로 비교한다. */
+    private Set<Monster> visibleMonsters() {
+        Floor floor = run.getFloor();
+        Set<Monster> visible = new HashSet<>();
+        for (Monster m : floor.getMonsters()) {
+            if (floor.isVisible(m.getPos().x(), m.getPos().y())) {
+                visible.add(m);
+            }
+        }
+        return visible;
     }
 
     private void waitForEnter() {
@@ -422,6 +447,7 @@ public class GameManager {
         Floor next = DungeonGenerator.generate(nextLevel);
         run.setFloor(next);
         run.getPlayer().setPos(next.getStartPos());
+        FieldOfView.update(next, next.getStartPos());
         run.getRunResult().reachFloor(nextLevel);
         run.getLog().add("지하 " + nextLevel + "층으로 내려왔습니다.");
     }
