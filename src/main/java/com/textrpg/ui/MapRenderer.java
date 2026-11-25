@@ -11,15 +11,17 @@ import com.textrpg.map.Floor;
 import com.textrpg.map.Tile;
 import com.textrpg.monster.Boss;
 import com.textrpg.monster.Monster;
+import com.textrpg.shop.Shop;
 
 /**
  * 층을 화면에 찍을 문자 줄들로 바꾼다. 출력은 하지 않고 줄 목록만 돌려준다 (출력은 ConsoleView).
  *
- * <p>한 칸에 여러 개가 겹치면 우선순위: 플레이어 {@code @} → 몬스터 기호 → 바닥 아이템 기호 → 타일 기호.
+ * <p>한 칸에 여러 개가 겹치면 우선순위: 플레이어 {@code @} → 상인 {@code M} → 몬스터 기호 → 바닥 아이템 기호 → 타일 기호.
  * 시야(FieldOfView)에 따라 안 본 칸은 공백, 본 적 있지만 지금 안 보이는 칸은 타일만 보인다(몬스터·아이템 숨김).
+ * 상인은 움직이지 않으므로 계단처럼 한 번 본 뒤에는 계속 보인다.
  * 시야는 그리기 전에 FieldOfView.update() 로 갱신되어 있어야 한다.
  *
- * <p>색(Painter.ANSI)을 쓰면 칸마다 Style 색을 입힌다. 몬스터는 빨강, 아이템은 종류별 색, 지금 안 보이는 칸은 회색이다.
+ * <p>색(Painter.ANSI)을 쓰면 칸마다 Style 색을 입힌다. 몬스터는 빨강, 상인은 굵은 노랑, 아이템은 종류별 색, 지금 안 보이는 칸은 회색이다.
  * 같은 색이 이어지는 칸은 한 번에 감싸 색 코드 수를 줄인다.
  */
 public class MapRenderer {
@@ -73,6 +75,9 @@ public class MapRenderer {
         }
         if (!floor.isSeen(x, y)) {
             return new Glyph(' ', null);
+        }
+        if (floor.isMerchantAt(pos)) {
+            return new Glyph(Shop.MERCHANT_SYMBOL, Style.MERCHANT);
         }
         Tile tile = floor.getTile(x, y);
         if (!floor.isVisible(x, y)) {

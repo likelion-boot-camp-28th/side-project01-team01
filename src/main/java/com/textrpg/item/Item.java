@@ -60,6 +60,16 @@ public abstract class Item {
         return kind.canDropOn(floorLevel);
     }
 
+    /** 효과 수치만. 상점 목록처럼 설명을 다 쓰기엔 좁은 곳에 쓴다. 예: "공격력 +3" */
+    public String getEffectText() {
+        return effectText();
+    }
+
+    /** 상점에서 살 때의 고정 가격(골드). */
+    public int getPrice() {
+        return kind.getPrice();
+    }
+
     /** 설명 뒤에 붙일 효과 수치. 예: "공격력 +3", "HP 10 회복" */
     protected abstract String effectText();
 

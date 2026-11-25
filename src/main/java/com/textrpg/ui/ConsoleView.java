@@ -17,6 +17,7 @@ import com.textrpg.meta.RunResult;
 import com.textrpg.meta.UpgradeType;
 import com.textrpg.monster.Monster;
 import com.textrpg.monster.MonsterType;
+import com.textrpg.shop.Shop;
 
 /**
  * 모든 콘솔 출력의 단일 창구. 다른 클래스는 System.out 을 직접 쓰지 않는다.
@@ -49,6 +50,11 @@ public class ConsoleView {
             new LegendEntry(')', "무기", Style.EQUIPMENT),
             new LegendEntry('[', "방어구", Style.EQUIPMENT));
     private static final int BAR_WIDTH = 10;
+    /** 상인이 보일 때 기호 안내에 덧붙이는 항목. */
+    private static final LegendEntry MERCHANT_LEGEND = new LegendEntry(Shop.MERCHANT_SYMBOL, "상인(t 대화)", Style.MERCHANT);
+    /** 상점 화면에서 아이템 이름·가격 칸의 너비. 가장 긴 이름("작은 치유 물약")과 가격("160골드")이 들어간다. */
+    private static final int SHOP_NAME_WIDTH = 16;
+    private static final int SHOP_PRICE_WIDTH = 9;
 
     private final boolean ansiClear;
     private final Painter painter;
@@ -119,7 +125,10 @@ public class ConsoleView {
         List<Monster> visibleMonsters = floor.getMonsters().stream()
                 .filter(m -> floor.isVisible(m.getPos().x(), m.getPos().y()))
                 .toList();
-        for (String line : formatLegend(visibleMonsters, painter)) {
+        boolean merchantSeen = floor.getShop()
+                .map(shop -> floor.isSeen(shop.getMerchantPos().x(), shop.getMerchantPos().y()))
+                .orElse(false);
+        for (String line : formatLegend(visibleMonsters, merchantSeen, painter)) {
             printLine(line);
         }
         printDivider();
@@ -164,6 +173,39 @@ public class ConsoleView {
         printLine("u 번호: 사용   e 번호: 장착   x 번호: 버리기");
     }
 
+    /**
+     * 상점 화면: 진열 상품(살 때 가격), 치료, 장착 중인 장비, 가방(팔 때 받는 값). 번호는 1부터 보여 준다.
+     * 명령 입력 안내는 입력을 받는 GameManager 가 출력한다.
+     */
+    public void printShop(Shop shop, Player player) {
+        printTitle(Shop.MERCHANT_NAME + "  |  골드 " + player.getGold()
+                + "  |  HP " + player.getStats().getHp() + "/" + player.getMaxHp());
+        printLine("판매 상품 (b 번호: 구매)");
+        List<Item> stock = shop.getStock();
+        if (stock.isEmpty()) {
+            printLine("  모두 팔렸습니다.");
+        }
+        for (int i = 0; i < stock.size(); i++) {
+            Item item = stock.get(i);
+            printLine(formatShopLine(i + 1, item, item.getPrice()) + item.getEffectText());
+        }
+        printLine("치료 (h): " + formatHealLine(shop));
+        printDivider();
+        for (String line : formatEquipment(player)) {
+            printLine(line);
+        }
+        printLine("가방 " + player.getInventory().size() + "/" + player.getInventory().getCapacity()
+                + " (s 번호: 판매, 상점가의 " + Shop.SELL_PERCENT + "%)");
+        List<Item> bag = player.getInventory().getItems();
+        if (bag.isEmpty()) {
+            printLine("  가방이 비어 있습니다.");
+        }
+        for (int i = 0; i < bag.size(); i++) {
+            printLine(formatShopLine(i + 1, bag.get(i), Shop.sellPrice(bag.get(i))).stripTrailing());
+        }
+        printDivider();
+    }
+
     /** 명령어 도움말. CommandParser 의 입력 규칙과 같은 내용. */
     public void printHelp() {
         printTitle("도움말");
@@ -171,6 +213,7 @@ public class ConsoleView {
         printLine("g         발밑의 아이템 줍기 (밟으면 자동으로 주움. 가방이 가득 찼을 때 다시 줍기)");
         printLine("i         가방 보기 (가방 화면에서 바로 u/e/x 번호 입력 가능)");
         printLine("l         지난 로그 보기 (메시지마다 몇 번째 턴인지 표시)");
+        printLine("t         옆에 있는 상인과 대화 (상점: 사기, 팔기, 치료)");
         printLine("u 번호    아이템 사용 (번호는 가방 화면 기준 1부터)");
         printLine("e 번호    무기·방어구 장착");
         printLine("x 번호    아이템 버리기");
@@ -181,7 +224,7 @@ public class ConsoleView {
         printLine("명령은 대소문자를 구분하지 않습니다.");
         printDivider();
         printLine("@ 플레이어   # 벽   : 복도   . 바닥   + 문   > 계단");
-        printLine("! 물약   ) 무기   [ 방어구   $ 골드   영문자 몬스터");
+        printLine("! 물약   ) 무기   [ 방어구   $ 골드   " + Shop.MERCHANT_SYMBOL + " 상인   영문자 몬스터");
         printLine(formatBossLegend());
     }
 
@@ -225,12 +268,17 @@ public class ConsoleView {
     }
 
     /**
-     * 탐험 화면의 기호 안내. 지형·아이템 기호는 항상, 몬스터는 넘겨받은 종류만 보여 준다.
+     * 탐험 화면의 기호 안내. 지형·아이템 기호는 항상, 상인은 본 적이 있을 때, 몬스터는 넘겨받은 종류만 보여 준다.
      * 보스는 일반 몬스터와 헷갈리지 않게 "보스" 를 붙인다. 화면 너비를 넘으면 기호 단위로 줄을 나눈다.
      * 기호는 지도와 같은 색으로 칠한다.
+     *
+     * @param showMerchant 상인 기호를 넣을지 (층에 상점이 있고 상인 칸을 본 적이 있을 때)
      */
-    static List<String> formatLegend(List<Monster> monsters, Painter painter) {
+    static List<String> formatLegend(List<Monster> monsters, boolean showMerchant, Painter painter) {
         List<LegendEntry> entries = new ArrayList<>(FIXED_LEGEND);
+        if (showMerchant) {
+            entries.add(MERCHANT_LEGEND);
+        }
         monsters.stream()
                 .map(Monster::getType)
                 .distinct()
@@ -342,6 +390,34 @@ public class ConsoleView {
                 || (c >= 0xFF00 && c <= 0xFF60)
                 || (c >= 0xFFE0 && c <= 0xFFE6);
         return wide ? 2 : 1;
+    }
+
+    /** 상점 화면의 상품·가방 한 줄 (효과 설명 앞까지). 예: " 1) 철 검           50골드   " */
+    static String formatShopLine(int number, Item item, int price) {
+        return padRight(" " + number + ") " + item.getDisplayName(), SHOP_NAME_WIDTH + 4)
+                + padRight(price + "골드", SHOP_PRICE_WIDTH);
+    }
+
+    /** 상점 화면의 치료 줄. 예: "20골드로 최대 HP 의 50% 회복 (상점마다 1회)" */
+    static String formatHealLine(Shop shop) {
+        String text = shop.getHealCost() + "골드로 최대 HP 의 " + Shop.HEAL_PERCENT + "% 회복";
+        return text + (shop.isHealUsed() ? " (이미 받음)" : " (상점마다 1회)");
+    }
+
+    /** 장착 중인 장비 두 줄. 한 줄에 쓰면 좋은 장비일 때 화면 너비를 넘는다. 예: "장착 무기    철 검(공격력 +3)" */
+    static List<String> formatEquipment(Player player) {
+        String weapon = player.getWeapon()
+                .map(w -> w.getDisplayName() + "(" + w.getEffectText() + ")")
+                .orElse("없음");
+        String armor = player.getArmor()
+                .map(a -> a.getDisplayName() + "(" + a.getEffectText() + ")")
+                .orElse("없음");
+        return List.of("장착 무기    " + weapon, "장착 방어구  " + armor);
+    }
+
+    /** 터미널 칸 수(displayWidth) 기준으로 width 칸이 되도록 뒤에 공백을 붙인다. 이미 넘으면 공백 하나만. */
+    static String padRight(String text, int width) {
+        return text + " ".repeat(Math.max(1, width - displayWidth(text)));
     }
 
     /** 결과 화면 제목. 예: "사망 - 늑대에게 쓰러졌습니다", "클리어 - 어둠의 파수꾼을 쓰러뜨렸습니다!" */

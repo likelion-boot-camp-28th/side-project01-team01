@@ -202,6 +202,17 @@ public class Player extends Entity implements ItemUser {
     }
 
     /**
+     * 골드를 낸다 (상점 구매·치료). 모자라면 내지 않고 false.
+     */
+    public boolean spendGold(int amount) {
+        if (amount < 0 || gold < amount) {
+            return false;
+        }
+        gold -= amount;
+        return true;
+    }
+
+    /**
      * 시작 보급품: 치유 물약 count 개를 가방에 넣는다 (영구 강화 START_POTION).
      * meta 패키지는 item 을 import 할 수 없어서(패키지 의존 방향) Profile.applyTo() 가 이 메서드를 부른다.
      */

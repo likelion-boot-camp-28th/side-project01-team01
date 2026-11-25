@@ -26,6 +26,7 @@ import com.textrpg.monster.Monster;
 import com.textrpg.monster.MonsterFactory;
 import com.textrpg.monster.MonsterType;
 import com.textrpg.monster.PileOfBones;
+import com.textrpg.shop.Shop;
 
 /**
  * SlotData 와 세이브 파일 줄을 서로 바꾼다. 파일을 읽고 쓰는 일은 SaveManager 가, 줄을 섹션으로 나누는 일은
@@ -37,6 +38,8 @@ import com.textrpg.monster.PileOfBones;
  *   <li>[RUN] deepestFloor: 파편 계산에 쓰는 가장 깊은 층</li>
  *   <li>[FLOOR] room=x,y,width,height: 방 목록 (Room.toSaveString)</li>
  *   <li>[MONSTERS] monster=종류,x,y,현재HP,깨어남(true/false)[,탄생 턴] — 탄생 턴은 뼈 무더기만</li>
+ *   <li>[SHOP] 상점이 있는 층에서만: 상인 위치 x, y, 치료를 받았는지 healUsed, 남은 진열 상품 item=id.
+ *       이 섹션이 없는 예전 세이브는 상점이 없는 층으로 읽는다.</li>
  * </ul>
  */
 final class SlotCodec {
@@ -53,6 +56,7 @@ final class SlotCodec {
     private static final String FLOOR = "FLOOR";
     private static final String MONSTERS = "MONSTERS";
     private static final String ITEMS = "ITEMS";
+    private static final String SHOP = "SHOP";
 
     private static final String LIST_SEPARATOR = ",";
     private static final String GOLD_PREFIX = "GOLD:";
@@ -184,6 +188,19 @@ final class SlotCodec {
             String what = fi.isGold() ? GOLD_PREFIX + fi.goldAmount() : fi.item().getId();
             w.put(ITEM_KEY, String.join(LIST_SEPARATOR, what, String.valueOf(fi.pos().x()), String.valueOf(fi.pos().y())));
         }
+
+        f.getShop().ifPresent(shop -> writeShop(w, shop));
+    }
+
+    private static void writeShop(SaveFileWriter w, Shop shop) {
+        w.section(SHOP);
+        w.put("x", shop.getMerchantPos().x());
+        w.put("y", shop.getMerchantPos().y());
+        w.put("healUsed", String.valueOf(shop.isHealUsed()));
+        w.comment("남은 진열 상품 (산 상품은 빠짐)");
+        for (Item item : shop.getStock()) {
+            w.put(ITEM_KEY, item.getId());
+        }
     }
 
     /** map0=..., map1=... 처럼 줄 번호를 붙여 쓴다. */
@@ -238,6 +255,8 @@ final class SlotCodec {
     /** 진행 중인 탐험을 되살린다. 세이브에 없는 강화 효과(가방 칸·경험치 배율)는 프로필로 다시 맞춘다. */
     private static GameContext readRun(SaveFileParser parser, Profile profile) {
         Floor floor = readFloor(parser);
+        // 상인 칸은 지나갈 수 없으므로 플레이어 위치를 확인하기 전에 놓는다
+        readShop(parser, floor);
         readMonsters(parser, floor);
         readItems(parser, floor);
         Player player = readPlayer(parser, floor);
@@ -367,6 +386,31 @@ final class SlotCodec {
             } else {
                 floor.addItem(FloorItem.of(readItem(ITEMS, f[0]), pos));
             }
+        }
+    }
+
+    /** [SHOP] 이 있으면 상점을 되살린다. 상인은 방 안 바닥 칸에 서 있어야 한다. */
+    private static void readShop(SaveFileParser parser, Floor floor) {
+        if (!parser.hasSection(SHOP)) {
+            return;
+        }
+        int x = parser.getInt(SHOP, "x");
+        int y = parser.getInt(SHOP, "y");
+        String where = "x=" + x + ", y=" + y;
+        Position pos = checkInside(floor, SHOP, where, x, y);
+        if (floor.roomAt(pos) == null || !floor.isWalkable(pos)) {
+            throw new SaveLoadException("[SHOP] 상인이 방 안 바닥이 아닌 칸에 있습니다: " + where);
+        }
+        String healUsedValue = parser.getString(SHOP, "healUsed").strip();
+        boolean healUsed = toBoolean(SHOP, "healUsed=" + healUsedValue, healUsedValue);
+        List<Item> stock = new ArrayList<>();
+        for (String id : parser.getList(SHOP, ITEM_KEY)) {
+            stock.add(readItem(SHOP, id));
+        }
+        try {
+            floor.setShop(Shop.restore(floor.getLevel(), pos, stock, healUsed));
+        } catch (IllegalArgumentException e) {
+            throw new SaveLoadException("[SHOP] 값이 잘못되었습니다: " + e.getMessage(), e);
         }
     }
 

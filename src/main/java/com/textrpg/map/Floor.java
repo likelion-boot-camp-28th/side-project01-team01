@@ -3,6 +3,7 @@ package com.textrpg.map;
 import com.textrpg.core.Position;
 import com.textrpg.item.FloorItem;
 import com.textrpg.monster.Monster;
+import com.textrpg.shop.Shop;
 import com.textrpg.util.RandomUtil;
 
 import java.util.ArrayList;
@@ -12,7 +13,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * 던전의 한 층 (60 x 20 타일 맵). 타일, 방, 몬스터, 바닥 아이템, 시작 위치, 계단을 가진다.
+ * 던전의 한 층 (60 x 20 타일 맵). 타일, 방, 몬스터, 바닥 아이템, 시작 위치, 계단, 상점(있을 때만)을 가진다.
  * map 패키지 밖에서는 DungeonGenerator.generate() / createTestFloor() / fromSave() 로만 만든다.
  */
 public class Floor {
@@ -30,6 +31,8 @@ public class Floor {
     private final List<FloorItem> items = new ArrayList<>();
     private Position stairs;
     private Position startPos;
+    /** 이 층의 상점. 없으면 null. */
+    private Shop shop;
 
     /**
      * 전부 ROCK 이고 seen/visible 이 전부 false 인 빈 층. 생성기와 fromSave 전용이라 package-private.
@@ -167,23 +170,25 @@ public class Floor {
     }
 
     /**
-     * p 로 걸어갈 수 있는 타일인지. 몬스터·플레이어가 있는지는 보지 않는다 (getMonsterAt 으로 따로 확인).
+     * p 로 걸어갈 수 있는 칸인지. 몬스터·플레이어가 있는지는 보지 않는다 (getMonsterAt 으로 따로 확인).
+     * 상인은 움직이지 않으므로 상인이 서 있는 칸은 벽처럼 막힌 칸으로 본다 (플레이어·몬스터 모두 지나갈 수 없음).
      *
      * @param p 좌표
-     * @return 맵 안이고 타일이 통행 가능하면 true
+     * @return 맵 안이고 타일이 통행 가능하고 상인 칸이 아니면 true
      */
     public boolean isWalkable(Position p) {
-        return isInBounds(p) && getTile(p).isWalkable();
+        return isInBounds(p) && getTile(p).isWalkable() && !isMerchantAt(p);
     }
 
     /**
      * p 에 무언가를 새로 놓을 수 있는지. 생성 배치와 순간이동 두루마리용.
      *
      * @param p 좌표
-     * @return 타일이 FLOOR 이고 몬스터·아이템이 없고 시작 위치가 아니면 true
+     * @return 타일이 FLOOR 이고 몬스터·아이템·상인이 없고 시작 위치가 아니면 true
      */
     public boolean isFree(Position p) {
-        return getTile(p) == Tile.FLOOR && getMonsterAt(p) == null && getItemAt(p) == null && !p.equals(startPos);
+        return getTile(p) == Tile.FLOOR && getMonsterAt(p) == null && getItemAt(p) == null && !p.equals(startPos)
+                && !isMerchantAt(p);
     }
 
     /**
@@ -242,6 +247,43 @@ public class Floor {
             }
         }
         return null;
+    }
+
+    /**
+     * 이 층의 상점.
+     *
+     * @return 상점, 상점이 없는 층이면 비어 있음
+     */
+    public Optional<Shop> getShop() {
+        return Optional.ofNullable(shop);
+    }
+
+    /**
+     * 상점을 놓는다. 생성 배치와 세이브 복원에서 쓴다. 상인 칸은 이때부터 지나갈 수 없다.
+     *
+     * @param shop 놓을 상점 (상인 위치는 shop.getMerchantPos())
+     */
+    public void setShop(Shop shop) {
+        this.shop = shop;
+    }
+
+    /**
+     * 상점이 있는 방. 생성할 때 이 방에는 몬스터·아이템·골드를 두지 않는다.
+     *
+     * @return 상인이 서 있는 방, 상점이 없으면 null (roomAt 과 같은 이유로 null)
+     */
+    public Room shopRoom() {
+        return shop == null ? null : roomAt(shop.getMerchantPos());
+    }
+
+    /**
+     * p 에 상인이 서 있는지.
+     *
+     * @param p 좌표
+     * @return 상점이 있고 p 가 상인 위치면 true
+     */
+    public boolean isMerchantAt(Position p) {
+        return shop != null && shop.getMerchantPos().equals(p);
     }
 
     /**

@@ -64,6 +64,8 @@ public final class CommandParserCheck {
         expect("l", List.of(Command.of(CommandType.LOG)));
         expect("L", List.of(Command.of(CommandType.LOG)));
         expect(".", List.of(Command.of(CommandType.WAIT)));
+        expect("t", List.of(Command.of(CommandType.TALK)));
+        expect("T", List.of(Command.of(CommandType.TALK)));
     }
 
     private static void checkItemCommands() {

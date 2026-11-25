@@ -38,6 +38,7 @@ def checkClasses = [
         'com.textrpg.save.SaveFileParserCheck',
         'com.textrpg.save.SaveFileWriterCheck',
         'com.textrpg.save.SaveManagerCheck',
+        'com.textrpg.shop.ShopCheck',
         'com.textrpg.ui.MapRendererCheck',
 ]
 
