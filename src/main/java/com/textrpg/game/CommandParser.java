@@ -40,7 +40,7 @@ public final class CommandParser {
         if (line == null) {
             return List.of();
         }
-        String input = line.trim();
+        String input = line.strip();
         if (input.isEmpty()) {
             return List.of();
         }
@@ -85,7 +85,7 @@ public final class CommandParser {
         }
         int number;
         try {
-            number = Integer.parseInt(input.substring(1).trim());
+            number = Integer.parseInt(input.substring(1).strip());
         } catch (NumberFormatException e) {
             // 숫자가 아니거나 int 범위를 넘으면 알 수 없는 입력으로 본다.
             return Optional.empty();
