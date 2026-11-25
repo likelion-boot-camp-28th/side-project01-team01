@@ -39,7 +39,7 @@ public record Command(CommandType type, Direction direction, int itemIndex) {
     }
 
     /**
-     * 방향도 가방 번호도 없는 명령 (PICK_UP, INVENTORY, DESCEND, SAVE_QUIT, HELP, WAIT).
+     * 방향도 가방 번호도 없는 명령 (PICK_UP, INVENTORY, DESCEND, SAVE_QUIT, HELP, LOG, TALK, WAIT).
      *
      * @throws IllegalArgumentException MOVE 나 아이템 명령을 넘겼을 때
      */

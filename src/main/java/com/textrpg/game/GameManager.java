@@ -7,7 +7,10 @@ import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import com.textrpg.context.GameContext;
 import com.textrpg.core.Position;
@@ -25,6 +28,7 @@ import com.textrpg.save.CorruptedRunException;
 import com.textrpg.save.SaveLoadException;
 import com.textrpg.save.SaveManager;
 import com.textrpg.save.SlotData;
+import com.textrpg.shop.Shop;
 import com.textrpg.ui.ConsoleView;
 import com.textrpg.ui.InputClosedException;
 import com.textrpg.ui.InputHandler;
@@ -48,6 +52,9 @@ import com.textrpg.ui.InputHandler;
 public class GameManager {
 
     private static final String COMMAND_PROMPT = "명령 (w/a/s/d 이동, i 가방, l 로그, > 내려가기, ? 도움말): ";
+    private static final String SHOP_PROMPT = "명령 (b 번호: 구매, s 번호: 판매, h: 치료, Enter: 나가기): ";
+    /** 상점 명령: "b 2", "s3", "h". 대소문자를 구분하지 않는다. */
+    private static final Pattern SHOP_COMMAND = Pattern.compile("([bsh])\\s*(\\d*)", Pattern.CASE_INSENSITIVE);
     private static final String PRESS_ENTER = "Enter 를 누르면 돌아갑니다.";
     private static final String INVENTORY_PROMPT = "명령 (u/e/x 번호, Enter: 돌아가기): ";
     private static final int MAX_NAME_LENGTH = 12;
@@ -319,7 +326,7 @@ public class GameManager {
 
     /**
      * 탐험 턴 루프: 화면 그리기 → 입력 → CommandParser.parse → 명령마다 처리.
-     * 화면 명령(INVENTORY, HELP, LOG, SAVE_QUIT)은 여기서 처리하고, 나머지는 turnSystem.playTurn() 에 넘긴다.
+     * 화면 명령(INVENTORY, HELP, LOG, TALK, SAVE_QUIT)은 여기서 처리하고, 나머지는 turnSystem.playTurn() 에 넘긴다.
      * 탐험 화면에는 이번 행동으로 생긴 메시지만 보이도록, 턴을 쓰는 명령을 실행하기 전에 지난 메시지를 읽음 처리한다.
      * 연속 이동(dddd)은 명령마다 한 턴씩 진행하고, 중간에 몬스터가 나타나거나 턴을 못 쓰면 남은 명령을 버린다.
      *
@@ -372,6 +379,71 @@ public class GameManager {
         }
     }
 
+    /**
+     * 상인과 대화 (t). 상인이 바로 옆(상하좌우)에 있으면 상점 화면을 연다. 상점에서 하는 일은 턴을 쓰지 않는다.
+     *
+     * @return 항상 PLAYING
+     */
+    private GameState talk() {
+        Floor floor = run.getFloor();
+        Position pos = run.getPlayer().getPos();
+        Optional<Shop> shop = floor.getShop().filter(s -> s.getMerchantPos().isAdjacent(pos));
+        if (shop.isEmpty()) {
+            run.getLog().add("말을 걸 상대가 없습니다. 상인 바로 옆에서 t 를 누르세요.");
+            return GameState.PLAYING;
+        }
+        run.getLog().markRead();
+        openShop(shop.get());
+        return GameState.PLAYING;
+    }
+
+    /**
+     * 상점 화면. b 번호(구매), s 번호(판매), h(치료)를 Enter 를 누를 때까지 반복한다.
+     * 결과 문장은 화면 아래에 보여 주고, 골드가 오간 거래는 탐험 로그에도 남긴다.
+     */
+    private void openShop(Shop shop) {
+        Player player = run.getPlayer();
+        String result = "";
+        while (true) {
+            view.clearScreen();
+            view.printShop(shop, player);
+            if (!result.isEmpty()) {
+                view.printLine(result);
+            }
+            String line = input.readLine(SHOP_PROMPT);
+            if (line.isEmpty()) {
+                return;
+            }
+            int goldBefore = player.getGold();
+            result = runShopCommand(shop, line);
+            if (player.getGold() != goldBefore) {
+                run.getLog().add(result);
+            }
+        }
+    }
+
+    /** 상점 명령 한 줄을 실행하고 결과 문장을 돌려준다. 번호는 화면 기준 1부터 받는다. */
+    private String runShopCommand(Shop shop, String line) {
+        Matcher m = SHOP_COMMAND.matcher(line.strip());
+        String error = "상점에서는 b 번호, s 번호, h 만 입력할 수 있습니다: " + line;
+        if (!m.matches()) {
+            return error;
+        }
+        char key = Character.toLowerCase(m.group(1).charAt(0));
+        String number = m.group(2);
+        if (key == 'h') {
+            return number.isEmpty() ? shop.heal(run.getPlayer()) : error;
+        }
+        int index;
+        try {
+            index = Integer.parseInt(number) - 1;
+        } catch (NumberFormatException e) {
+            // 번호가 없거나 int 범위를 넘을 때
+            return error;
+        }
+        return key == 'b' ? shop.buy(run.getPlayer(), index) : shop.sell(run.getPlayer(), index);
+    }
+
     private static boolean isItemCommand(CommandType type) {
         return type == CommandType.USE || type == CommandType.EQUIP || type == CommandType.DROP;
     }
@@ -379,11 +451,11 @@ public class GameManager {
     /** 턴을 쓰지 않고 다른 화면을 여는 명령인지. 이 명령들은 CommandParser 가 한 줄에 하나만 만든다. */
     private static boolean isScreenCommand(CommandType type) {
         return type == CommandType.INVENTORY || type == CommandType.HELP
-                || type == CommandType.LOG || type == CommandType.SAVE_QUIT;
+                || type == CommandType.LOG || type == CommandType.TALK || type == CommandType.SAVE_QUIT;
     }
 
     /**
-     * 한 줄에서 나온 명령들을 차례로 실행한다. 화면 명령(INVENTORY, HELP, LOG, SAVE_QUIT)은 CommandParser 가
+     * 한 줄에서 나온 명령들을 차례로 실행한다. 화면 명령(INVENTORY, HELP, LOG, TALK, SAVE_QUIT)은 CommandParser 가
      * 한 줄에 하나만 만들므로 여기서 바로 처리한다. 연속 이동은 턴을 못 썼거나 중단 조건에 걸리면 남은 명령을 버린다.
      *
      * @return 탐험이 이어지면 PLAYING, 아니면 다음 상태 (DEAD, VICTORY, SLOT_MENU)
@@ -405,6 +477,9 @@ public class GameManager {
                     view.printLogHistory(run.getLog());
                     waitForEnter();
                     return GameState.PLAYING;
+                }
+                case TALK -> {
+                    return talk();
                 }
                 case SAVE_QUIT -> {
                     return saveAndQuit();

@@ -29,6 +29,7 @@ import com.textrpg.meta.UpgradeType;
 import com.textrpg.monster.Monster;
 import com.textrpg.monster.MonsterFactory;
 import com.textrpg.monster.MonsterType;
+import com.textrpg.shop.Shop;
 
 /**
  * SaveManager 파일 입출력과 프로필 저장·불러오기(SlotCodec) 확인용. JUnit 대신 main 으로 실행한다 (Team_Rules 2.11).
@@ -62,6 +63,8 @@ public final class SaveManagerCheck {
         withTempDir(SaveManagerCheck::checkRunRoundTrip);
         withTempDir(SaveManagerCheck::checkBrokenRun);
         withTempDir(SaveManagerCheck::checkRunModifiers);
+        withTempDir(SaveManagerCheck::checkShopRoundTrip);
+        withTempDir(SaveManagerCheck::checkBrokenShop);
         checkRunResultRestore();
 
         System.out.println("통과 " + passed + " / 실패 " + failed);
@@ -362,6 +365,55 @@ public final class SaveManagerCheck {
         m.writeLines(1, replaceKey(valid, "shards=", "shards=-1"));
         SaveLoadException e = expectThrows("프로필이 손상되면 전체 손상", SaveLoadException.class, () -> m.load(1));
         expect("프로필 손상은 CorruptedRunException 아님", e instanceof CorruptedRunException, false);
+    }
+
+    /** 상점이 있는 층: [SHOP] 에 상인 위치, 치료 여부, 남은 진열 상품을 쓰고 그대로 되살린다. 상점이 없으면 섹션도 없다. */
+    private static void checkShopRoundTrip(Path root) {
+        SaveManager m = new SaveManager(root.resolve("saves"));
+        m.save(1, SlotData.withRun(sampleProfile(), sampleRun()));
+        expect("상점 없는 층은 [SHOP] 없음", SaveFileParser.parse(m.readLines(1)).hasSection("SHOP"), false);
+        expect("상점 없는 층을 불러오면 상점 없음", m.load(1).run().orElseThrow().getFloor().getShop().isPresent(), false);
+
+        GameContext saved = sampleRun();
+        saved.getFloor().setShop(sampleShop());
+        m.save(1, SlotData.withRun(sampleProfile(), saved));
+        SaveFileParser p = SaveFileParser.parse(m.readLines(1));
+        expect("[SHOP] 상인 위치", new Position(p.getInt("SHOP", "x"), p.getInt("SHOP", "y")), new Position(33, 7));
+        expect("[SHOP] 치료 여부", p.getString("SHOP", "healUsed"), "true");
+        expect("[SHOP] 남은 상품", p.getList("SHOP", "item"), List.of("IRON_SWORD", "HP_POTION_S"));
+
+        Shop shop = m.load(1).run().orElseThrow().getFloor().getShop().orElseThrow();
+        expect("복원: 상인 위치", shop.getMerchantPos(), new Position(33, 7));
+        expect("복원: 치료 여부", shop.isHealUsed(), true);
+        expect("복원: 상품", shop.getStock().stream().map(i -> i.getId()).toList(), List.of("IRON_SWORD", "HP_POTION_S"));
+        expect("복원: 치료 가격은 층 기준", shop.getHealCost(), saved.getFloor().getLevel() * Shop.HEAL_COST_PER_FLOOR);
+    }
+
+    private static void checkBrokenShop(Path root) {
+        SaveManager m = new SaveManager(root.resolve("saves"));
+        GameContext run = sampleRun();
+        run.getFloor().setShop(sampleShop());
+        m.save(1, SlotData.withRun(sampleProfile(), run));
+        List<String> valid = m.readLines(1);
+
+        expectBrokenRun(m, "상인이 방 밖", with(valid, "x=33", "x=0"));
+        expectBrokenRun(m, "치료 여부가 true/false 아님", with(valid, "healUsed=true", "healUsed=yes"));
+        expectBrokenRun(m, "모르는 상품", with(valid, "item=IRON_SWORD", "item=MAGIC_RING"));
+        Position start = run.getPlayer().getPos();
+        expectBrokenRun(m, "플레이어가 상인 칸에 있음",
+                with(with(valid, "x=33", "x=" + start.x()), "y=7", "y=" + start.y()));
+        List<String> tooMany = new ArrayList<>(valid);
+        int last = tooMany.lastIndexOf("item=HP_POTION_S");
+        for (int i = 0; i < Shop.STOCK_SIZE; i++) {
+            tooMany.add(last, "item=HP_POTION_S");
+        }
+        expectBrokenRun(m, "진열 상품이 너무 많음", tooMany);
+    }
+
+    /** 테스트 층 두 번째 방(25,4 ~ 34,9)의 상점. 철 검·작은 치유 물약이 남았고 치료는 받았다. */
+    private static Shop sampleShop() {
+        return Shop.restore(1, new Position(33, 7),
+                List.of(ItemFactory.createById("IRON_SWORD"), ItemFactory.createById("HP_POTION_S")), true);
     }
 
     /** 가방 칸·경험치 배율은 세이브에 없어서 불러올 때 프로필로 다시 맞춘다. 강화가 두 번 붙으면 안 된다. */

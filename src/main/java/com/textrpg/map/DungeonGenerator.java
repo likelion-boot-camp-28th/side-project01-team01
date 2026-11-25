@@ -8,6 +8,7 @@ import com.textrpg.monster.Boss;
 import com.textrpg.monster.Monster;
 import com.textrpg.monster.MonsterFactory;
 import com.textrpg.monster.MonsterType;
+import com.textrpg.shop.Shop;
 import com.textrpg.util.RandomUtil;
 
 import java.util.ArrayDeque;
@@ -135,6 +136,7 @@ public final class DungeonGenerator {
         }
         connectRooms(f);
         placeStartAndGoal(f);
+        placeShop(f);
         placeMonsters(f);
         placeGold(f);
         placeItems(f);
@@ -273,21 +275,38 @@ public final class DungeonGenerator {
     }
 
     /**
-     * 시작 방을 뺀 방들에서 빈 칸을 고른다. 몬스터·아이템·골드 배치에 쓴다.
+     * Shop.MIN_FLOOR 층부터 Shop.APPEAR_PERCENT 확률로 상점을 연다.
+     * 시작 방과 마지막 방(계단·보스)을 뺀 방 중 하나가 상점방이 되고, 상인은 그 방 중심에 선다.
+     * 방이 세로 3칸·가로 4칸 이상이라 중심 한 칸이 막혀도 방 안을 돌아서 지나갈 수 있다.
      */
-    private static Position randomPositionOutsideStartRoom(Floor f) {
-        Room startRoom = f.roomAt(f.getStartPos());
-        for (int i = 0; i < OUTSIDE_START_TRIES; i++) {
-            Position p = f.randomFreePosition();
-            if (f.roomAt(p) != startRoom) {
-                return p;
-            }
+    private static void placeShop(Floor f) {
+        if (f.getLevel() < Shop.MIN_FLOOR || !RandomUtil.chance(Shop.APPEAR_PERCENT)) {
+            return;
         }
-        throw new IllegalStateException("시작 방 밖의 빈 칸을 " + OUTSIDE_START_TRIES + "번 안에 찾지 못했습니다.");
+        List<Room> rooms = f.getRooms();
+        // 0번은 시작 방, 마지막은 계단(5층은 보스) 방
+        Room shopRoom = RandomUtil.pick(rooms.subList(1, rooms.size() - 1));
+        f.setShop(Shop.open(f.getLevel(), shopRoom.center()));
     }
 
     /**
-     * 시작 방을 뺀 방들에 몬스터 MIN_MONSTERS ~ MAX_MONSTERS 마리.
+     * 시작 방과 상점방을 뺀 방들에서 빈 칸을 고른다. 몬스터·아이템·골드 배치에 쓴다.
+     */
+    private static Position randomPositionOutsideStartRoom(Floor f) {
+        Room startRoom = f.roomAt(f.getStartPos());
+        Room shopRoom = f.shopRoom();
+        for (int i = 0; i < OUTSIDE_START_TRIES; i++) {
+            Position p = f.randomFreePosition();
+            Room room = f.roomAt(p);
+            if (room != startRoom && room != shopRoom) {
+                return p;
+            }
+        }
+        throw new IllegalStateException("시작 방·상점방 밖의 빈 칸을 " + OUTSIDE_START_TRIES + "번 안에 찾지 못했습니다.");
+    }
+
+    /**
+     * 시작 방·상점방을 뺀 방들에 몬스터 MIN_MONSTERS ~ MAX_MONSTERS 마리.
      */
     private static void placeMonsters(Floor f) {
         int monsterNum = RandomUtil.nextInt(MIN_MONSTERS, MAX_MONSTERS);
@@ -299,7 +318,7 @@ public final class DungeonGenerator {
     }
 
     /**
-     * 시작 방을 뺀 방들에 아이템 MIN_ITEMS ~ MAX_ITEMS 개.
+     * 시작 방·상점방을 뺀 방들에 아이템 MIN_ITEMS ~ MAX_ITEMS 개.
      */
     private static void placeItems(Floor f) {
         int itemCount = RandomUtil.nextInt(MIN_ITEMS, MAX_ITEMS);
@@ -311,7 +330,7 @@ public final class DungeonGenerator {
     }
 
     /**
-     * 시작 방을 뺀 방들에 골드 더미 MIN_GOLD_PILES ~ MAX_GOLD_PILES 개. 더미당 층 x GOLD_PER_FLOOR_MIN ~ MAX.
+     * 시작 방·상점방을 뺀 방들에 골드 더미 MIN_GOLD_PILES ~ MAX_GOLD_PILES 개. 더미당 층 x GOLD_PER_FLOOR_MIN ~ MAX.
      */
     private static void placeGold(Floor f) {
         int pileCount = RandomUtil.nextInt(MIN_GOLD_PILES, MAX_GOLD_PILES);

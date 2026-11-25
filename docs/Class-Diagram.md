@@ -20,6 +20,8 @@ classDiagram
     Floor --> Room
     Floor --> Monster
     Floor --> FloorItem
+    Floor --> Shop
+    GameManager ..> Shop : 상점 화면
     Player --> Inventory
     Inventory --> Item
     Entity <|-- Player
@@ -39,6 +41,7 @@ classDiagram
 | B | 캐릭터·아이템·영구 성장 | Entity, Player, Job, Stats, Item, ItemKind, Weapon, Armor, Potion, Scroll(P1), Food(P1), ItemType, ItemUser, Inventory, FloorItem, ItemFactory, ItemIdentifier(P1), Profile, UpgradeType, RunResult, ShardCalculator |
 | C | 몬스터·전투 | Monster, Boss, PileOfBones, MonsterType, MonsterFactory, MonsterAI, CombatSystem, DamageCalculator, AttackResult |
 | D | 맵·생성 | Floor, Tile, Room, DungeonGenerator, FieldOfView(P1), DungeonGeneratorCheck(검증용, `src/test/java`) |
+| A | 상점 (`shop` 패키지, 9절) | Shop, ShopCheck(검증용, `src/test/java`) |
 | 공통 | `core` 패키지 (수정 전 팀 공유) | Position, Direction, MessageLog |
 | 공통 | `context` 패키지 (수정 전 팀 공유) | GameContext |
 
@@ -54,7 +57,8 @@ classDiagram
 > | 6 | `combat` | `context`, `monster`, `entity`, `core` |
 > | 5 | `context` | `meta`, `map`, `entity`, `core` |
 > | 4 | `meta` | `entity` |
-> | 4 | `map` | `monster`, `item`, `core` |
+> | 4 | `map` | `monster`, `shop`, `item`, `core` |
+> | 3 | `shop` | `entity`, `item`, `core` |
 > | 3 | `monster` | `entity`, `core` |
 > | 2 | `entity` | `item`, `core` |
 > | 1 | `item` | `core` |
@@ -150,6 +154,8 @@ classDiagram
         DESCEND
         SAVE_QUIT
         HELP
+        LOG
+        TALK
         WAIT
     }
     class CommandParser {
@@ -238,7 +244,7 @@ classDiagram
 >
 > `MapRenderer.glyphAt()` 우선순위: 플레이어 `@` → 몬스터 기호 → 바닥 아이템 기호 → 타일 기호. 시야에 따라 안 본 칸은 공백, 본 적 있지만 지금 안 보이는 칸은 타일만(몬스터·아이템 숨김). 기호 안내에도 지금 보이는 몬스터만 넣는다.
 >
-> 색(P2): 칸마다 `Style`을 정하고 `Painter.ANSI`가 ANSI 색 코드로 감싼다. 몬스터 빨강, 보스 굵은 자홍, 아이템은 종류별(골드 노랑, 물약 초록, 무기·방어구 청록), 본 적만 있는 칸 회색, 계단은 기억한 칸이어도 초록. `--no-color` 또는 환경 변수 `NO_COLOR`면 `Painter.PLAIN`(색 없음). 너비 계산(`ConsoleView.displayWidth`)은 색 코드를 빼고 센다. 인자 없는 `render(f, p)`는 색 없는 글자를 돌려준다 (확인용·다른 파트용).
+> 색(P2): 칸마다 `Style`을 정하고 `Painter.ANSI`가 ANSI 색 코드로 감싼다. 몬스터 빨강, 보스 굵은 자홍, 상인 굵은 노랑, 아이템은 종류별(골드 노랑, 물약 초록, 무기·방어구 청록), 본 적만 있는 칸 회색, 계단은 기억한 칸이어도 초록. `--no-color` 또는 환경 변수 `NO_COLOR`면 `Painter.PLAIN`(색 없음). 너비 계산(`ConsoleView.displayWidth`)은 색 코드를 빼고 센다. 인자 없는 `render(f, p)`는 색 없는 글자를 돌려준다 (확인용·다른 파트용).
 >
 > 연속 이동(`dddd`)은 이번 턴에 피해를 입었거나, 전에 안 보이던 몬스터가 보이게 됐거나, 몬스터가 바로 옆에 있으면 남은 이동을 버린다 (`GameManager.isInterrupted`).
 
@@ -312,6 +318,7 @@ classDiagram
         +useItem(int index) String
         +dropItem(int index) Item
         +addGold(int amount)
+        +spendGold(int amount) boolean
         +regenerate(int turn)
         +isPoisoned() boolean
         +poison(int turn) boolean
@@ -343,6 +350,8 @@ classDiagram
         +getDisplayName() String
         +getSymbol() char
         +getDescription() String
+        +getEffectText() String
+        +getPrice() int
         +canDropOn(int floorLevel) boolean
         #effectText()* String
         +use(ItemUser user)* String
@@ -364,9 +373,11 @@ classDiagram
         -String description
         -int minFloor
         -int maxFloor
+        -int price
         -Function creator
         ~create() Item
         +canDropOn(int floorLevel) boolean
+        +getPrice() int
     }
     class ItemType {
         <<enumeration>>
@@ -606,6 +617,7 @@ classDiagram
         -List~FloorItem~ items
         -Position stairs
         -Position startPos
+        -Shop shop
         ~Floor(int level)
         +fromSave(int level, List~String~ tiles, List~String~ seen, List~String~ rooms)$ Floor
         +getLevel() int
@@ -638,6 +650,10 @@ classDiagram
         +exportRooms() List~String~
         ~setTile(int x, int y, Tile t)
         ~addRoom(Room r)
+        +getShop() Optional~Shop~
+        +setShop(Shop shop)
+        +shopRoom() Room
+        +isMerchantAt(Position p) boolean
         ~sortRoomsByX()
         ~setStartPos(Position p)
         ~setStairs(Position p)
@@ -716,6 +732,7 @@ classDiagram
         -placeMonsters(Floor f)$
         -placeItems(Floor f)$
         -placeGold(Floor f)$
+        -placeShop(Floor f)$
         ~isReachable(Floor f, Position a, Position b)$ boolean
     }
     class FieldOfView {
@@ -732,6 +749,7 @@ classDiagram
     Floor *-- Room
     Floor o-- Monster
     Floor o-- FloorItem
+    Floor o-- Shop
     DungeonGenerator ..> Floor : creates
     DungeonGenerator ..> Room : creates
     DungeonGenerator ..> MonsterFactory : createRandom, createBoss
@@ -748,8 +766,8 @@ classDiagram
 | `fromSave(...)` | `tiles`·`seen`은 `HEIGHT`줄 × `WIDTH`자, `rooms`는 `Room.toSaveString()` 형식. 줄 수·길이 불일치, 모르는 문자, 잘못된 방 형식이면 `IllegalArgumentException` (A의 `SaveManager`가 `SaveLoadException`으로 감싼다). `stairs`는 타일에서 `STAIRS_DOWN`을 찾아 복원(없으면 5층), `startPos`는 첫 방 중심 | A |
 | `getTile(...)` | 맵 밖이면 `ROCK`을 반환한다(예외 없음). 범위 검사를 호출하는 쪽마다 반복하지 않게 하기 위해서다 | A, C |
 | `isInBounds(p)` | 0 ≤ x < `WIDTH`, 0 ≤ y < `HEIGHT` | 전체 |
-| `isWalkable(p)` | 범위 안이고 타일이 통행 가능하면 true. **몬스터·플레이어는 보지 않는다** | A, C |
-| `isFree(p)` | 타일이 `FLOOR`이고 몬스터·아이템이 없고 시작 위치가 아니면 true. 배치·순간이동용 | D, B |
+| `isWalkable(p)` | 범위 안이고 타일이 통행 가능하고 상인 칸이 아니면 true. **몬스터·플레이어는 보지 않는다**. 상인은 움직이지 않으므로 벽처럼 막힌 칸으로 본다 | A, C |
+| `isFree(p)` | 타일이 `FLOOR`이고 몬스터·아이템·상인이 없고 시작 위치가 아니면 true. 배치·순간이동용 | D, B |
 | `randomFreePosition()` | 무작위 방 안에서 `isFree`인 칸. 정해진 횟수 안에 못 찾으면 `IllegalStateException` | D, B(순간이동 두루마리) |
 | `getStairs()` | 5층은 계단이 없으므로 `Optional.empty()` | A(`DESCEND`, 렌더링) |
 | `roomAt(p)` | 방 **내부**(`Room.contains`)에 있으면 그 방, 복도·문·벽이면 **null** | C(같은 방 판정), D(시야) |
@@ -760,6 +778,8 @@ classDiagram
 | `markSeen` / `isSeen` | 한 번이라도 본 칸. 세이브 대상 | D, A |
 | `setVisible` / `isVisible` / `clearVisible` | **P1**. 이번 턴에 보이는 칸. `setVisible()`은 `seen`도 함께 표시한다. 세이브하지 않는다 | D, A(렌더링) |
 | `revealAll()` | **P1**. 모든 칸을 `seen`으로 표시 (지도 두루마리) | B |
+| `getShop()` / `setShop(shop)` | 이 층의 상점. 없으면 `Optional.empty()`. `setShop()`은 생성 배치와 세이브 복원에서 사용 | D, A |
+| `shopRoom()` / `isMerchantAt(p)` | 상인이 서 있는 방(없으면 null), p가 상인 칸인지 | D, A |
 | `exportTiles()` / `exportSeen()` / `exportRooms()` | 세이브용 문자열. `exportRooms()`는 방마다 `x,y,width,height` 한 줄 | A |
 
 > `MapRenderer.glyphAt()`은 `seen`/`visible`을 보고 그린다: 안 본 칸은 공백, 본 적만 있는 칸은 타일만, 보이는 칸은 몬스터·아이템까지.
@@ -780,13 +800,14 @@ classDiagram
 2. **방 배치**: 내부 크기 4~12 × 3~6인 방을 최대 50회 시도해 `intersects`가 없는 것만 추가한다(최대 9개). `tryGenerate`는 배치 후 `getRooms().size()`가 `MIN_ROOMS` 미만이면 이번 시도를 실패로 처리한다. 추가한 방마다 둘레는 `WALL`, 내부는 `FLOOR`로 채운다.
 3. **복도 연결**: 방을 x좌표순으로 정렬(`sortRoomsByX`)한 뒤 i번 중심 ↔ i+1번 중심을 L자로 판다. 가로를 먼저 팔지 세로를 먼저 팔지는 무작위다. `carveTile` 규칙은 `ROCK` → `CORRIDOR`, `WALL` → `DOOR`이고 `FLOOR`·`DOOR`는 그대로 둔다.
 4. **시작·목표** (`placeStartAndGoal`): 첫 방 `randomInside()`를 시작 위치로 정한다. 1~4층은 마지막 방 `randomInside()`에 `STAIRS_DOWN`을 놓는다. 5층(`MAX_FLOOR`)은 계단 대신 마지막 방에 `MonsterFactory.createBoss(pos)`를 놓는다.
-5. **배치**: 시작 방을 뺀 방들의 `isFree` 칸에 다음을 놓는다.
+5. **상점** (`placeShop`): `Shop.MIN_FLOOR`(2)층부터 `Shop.APPEAR_PERCENT`(25%) 확률로, 시작 방과 마지막 방(계단·보스)을 뺀 방 하나의 중심에 상인을 세우고 `Shop.open(level, center)`로 진열 상품을 고른다. 방은 최소 4×3이라 중심 한 칸이 막혀도 방 안을 돌아서 지나갈 수 있다.
+6. **배치**: 시작 방과 상점방을 뺀 방들의 `isFree` 칸에 다음을 놓는다.
    - 몬스터 4~8마리: `MonsterFactory.createRandom(level, pos)`
    - 아이템 3~6개: `ItemFactory.createRandom(level)`
    - 골드 더미: `FloorItem` 골드
-6. **검증**: BFS(`isReachable`, 타일만 검사, 몬스터는 무시)로 시작 위치 → 계단(5층은 보스 위치) 도달을 확인한다.
+7. **검증**: BFS(`isReachable`, `isWalkable`로 검사, 몬스터는 무시)로 시작 위치 → 계단(5층은 보스 위치) 도달을 확인한다.
 
-2·6단계에서 실패하면 1단계부터 다시 한다(`tryGenerate`가 `Optional.empty()`를 반환). `MAX_ATTEMPTS`번 연속 실패하면 `IllegalStateException`을 던진다.
+2·7단계에서 실패하면 1단계부터 다시 한다(`tryGenerate`가 `Optional.empty()`를 반환). `MAX_ATTEMPTS`번 연속 실패하면 `IllegalStateException`을 던진다.
 
 **생성 상수 (`DungeonGenerator`에 모음, Team_Rules 1.2)**: 위 다이어그램의 `DungeonGenerator` 상수와 같다. 값은 이 표가 기준이다. 다른 파트도 쓰는 `MAX_FLOOR`만 `public`, 나머지는 `private`.
 
@@ -821,6 +842,7 @@ classDiagram
 - 1~4층은 계단 정확히 1개, 5층은 계단 0개 + 보스 1마리
 - 몬스터·아이템 개수가 범위 안, 같은 칸에 두 개 이상 놓이지 않음, 시작 위치에 아무것도 없음
 - `exportTiles/Seen/Rooms()` → `fromSave()` 왕복 결과가 원본과 같음
+- 상점: 1층에는 없음, 2~5층 출현 비율이 25% 근처, 상인은 시작·마지막 방이 아닌 방 중심, 상점방에 몬스터·아이템·골드 없음, 상인 칸은 지나갈 수 없고 상인 옆 칸에는 걸어갈 수 있음, 진열 5개 (상점방은 "모든 방 중심 도달" 검사에서 빼고 상인 옆 칸으로 확인)
 
 ### 5.6 변경 사항과 다른 파트 합의 필요 항목
 
@@ -957,7 +979,7 @@ classDiagram
     SaveLoadException --|> RuntimeException
 ```
 
-**파일 구조**: 프로필 섹션 `[META]`, `[PROFILE]`, `[UPGRADES]`는 항상 있고, 탐험 섹션 `[RUN]`, `[PLAYER]`, `[INVENTORY]`, `[IDENTIFY]`(P1), `[FLOOR]`(타일·탐험 20줄씩), `[MONSTERS]`, `[ITEMS]`는 진행 중인 탐험이 있을 때만 쓴다.
+**파일 구조**: 프로필 섹션 `[META]`, `[PROFILE]`, `[UPGRADES]`는 항상 있고, 탐험 섹션 `[RUN]`, `[PLAYER]`, `[INVENTORY]`, `[IDENTIFY]`(P1), `[FLOOR]`(타일·탐험 20줄씩), `[MONSTERS]`, `[ITEMS]`는 진행 중인 탐험이 있을 때만 쓴다. `[SHOP]`(상인 `x`·`y`, `healUsed`, 남은 진열 상품 `item=`)은 현재 층에 상점이 있을 때만 쓴다. 이 섹션이 없는 예전 세이브는 상점이 없는 층으로 읽는다.
 
 **저장 시점**
 - 슬롯 처음 생성, 제단에서 강화 구매, 탐험 시작 직후, `S` 저장 후 종료, 사망·클리어 직후
@@ -1039,3 +1061,51 @@ sequenceDiagram
     end
     TS-->>GM: TurnOutcome (NO_TURN / TURN_USED / DESCENDED / VICTORY / DIED)
 ```
+
+---
+
+## 9. 상점 (A 파트)
+
+```mermaid
+classDiagram
+    class Shop {
+        +MERCHANT_SYMBOL$ char
+        +MIN_FLOOR$ int
+        +APPEAR_PERCENT$ int
+        +STOCK_SIZE$ int
+        +NEXT_FLOOR_PERCENT$ int
+        +SELL_PERCENT$ int
+        +HEAL_COST_PER_FLOOR$ int
+        +HEAL_PERCENT$ int
+        -int level
+        -Position merchantPos
+        -List~Item~ stock
+        -boolean healUsed
+        +open(int level, Position merchantPos)$ Shop
+        +restore(int level, Position merchantPos, List~Item~ stock, boolean healUsed)$ Shop
+        ~rollStock(int level)$ List~ItemKind~
+        +sellPrice(Item item)$ int
+        +getStock() List~Item~
+        +getHealCost() int
+        +buy(Player p, int index) String
+        +sell(Player p, int index) String
+        +heal(Player p) String
+    }
+    Floor o-- Shop
+    Shop --> Item
+    Shop ..> Player : 골드·가방·HP
+    Shop ..> ItemFactory : createById
+    GameManager ..> Shop : t → 상점 화면
+    ConsoleView ..> Shop : printShop
+```
+
+| 항목 | 규칙 |
+|---|---|
+| 등장 | 지하 2~5층, 층마다 25%. 시작 방·마지막 방(계단·보스)이 아닌 방 하나가 상점방. 상점방에는 몬스터·아이템·골드를 생성하지 않는다 (다른 방 몬스터는 들어올 수 있음) |
+| 상인 | 상점방 중심, 기호 `M`. 지나갈 수 없다(`Floor.isWalkable`). 부딪히면 대화 방법을 안내하고 턴을 쓰지 않는다. 한 번 본 뒤에는 시야 밖에서도 보인다 |
+| 대화 | 상인 바로 옆(상하좌우)에서 `t`. 상점 화면은 `b 번호`(구매), `s 번호`(판매), `h`(치료), Enter(나가기). 상점 화면의 일은 턴을 쓰지 않고, 골드가 오간 거래는 탐험 로그에도 남긴다 |
+| 진열 | 5칸. 칸마다 그 층에서 나오는 아이템(`ItemKind.canDropOn`)을 같은 확률로 고른다. 이미 진열된 종류면 그 층 아이템 중에서 한 번만 다시 고르고, 또 겹치면 그대로 둔다. 칸마다 처음 고를 때만 2% 확률로 다음 층부터 처음 나오는 아이템을 고른다 (상점 하나에 약 10%, 5층은 다음 층이 없음). `ItemKind` 순서로 정렬 |
+| 구매 | `ItemKind` 상점가(고정). 가방이 가득 차거나 골드가 모자라면 아무것도 바뀌지 않는다. 산 상품은 진열에서 빠진다 |
+| 판매 | 상점가의 20% (소수점 버림). 판 아이템은 사라진다. 장착 중인 장비는 가방에 없으므로 팔 수 없다 |
+| 치료 | `층 × 10` 골드로 최대 HP의 50% 회복. 상점마다 1회. HP가 가득하면 골드를 받지 않는다 |
+| 세이브 | `[SHOP]` 섹션 (7절) |

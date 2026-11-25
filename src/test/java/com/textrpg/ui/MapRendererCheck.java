@@ -9,6 +9,7 @@ import com.textrpg.core.Position;
 import com.textrpg.entity.Job;
 import com.textrpg.entity.Player;
 import com.textrpg.item.FloorItem;
+import com.textrpg.item.Item;
 import com.textrpg.item.ItemFactory;
 import com.textrpg.item.ItemType;
 import com.textrpg.map.DungeonGenerator;
@@ -19,9 +20,11 @@ import com.textrpg.meta.RunResult;
 import com.textrpg.monster.Monster;
 import com.textrpg.monster.MonsterFactory;
 import com.textrpg.monster.MonsterType;
+import com.textrpg.shop.Shop;
 
 /**
- * MapRenderer(시야·색 포함)와 ConsoleView 의 문자열 생성(formatHeader, formatStatusBar, 결과 화면, 기호 안내, 메시지 줄바꿈, 색) 확인용.
+ * MapRenderer(시야·상인·색 포함)와 ConsoleView 의 문자열 생성(formatHeader, formatStatusBar, 결과 화면, 기호 안내, 메시지 줄바꿈,
+ * 색, 상점 화면) 확인용.
  * JUnit 대신 main 으로 실행한다 (Team_Rules 2.11). 실패가 하나라도 있으면 종료 코드 1.
  */
 public final class MapRendererCheck {
@@ -39,6 +42,7 @@ public final class MapRendererCheck {
         checkMonsterAndItem();
         checkPriority();
         checkFieldOfView();
+        checkMerchant();
         checkStatusBar();
         checkHeader();
         checkRunResult();
@@ -46,6 +50,7 @@ public final class MapRendererCheck {
         checkMessages();
         checkMapColors();
         checkTextColors();
+        checkShopLines();
 
         System.out.println("통과 " + passed + " / 실패 " + failed);
         if (failed > 0) {
@@ -170,6 +175,25 @@ public final class MapRendererCheck {
                 countNonBlank(start) < countNonBlank(renderer.render(visibleTestFloor(), walker)), true);
     }
 
+    /** 상인은 몬스터보다 앞에 그리고, 움직이지 않으므로 본 적만 있으면 시야 밖에서도 보인다. */
+    private static void checkMerchant() {
+        Floor floor = DungeonGenerator.createTestFloor();
+        Player player = playerAtStart(floor);
+        Position merchant = freeFloorPositions(floor, player, 1).get(0);
+        floor.setShop(Shop.open(2, merchant));
+        MapRenderer renderer = new MapRenderer();
+
+        expect("안 본 상인은 공백", charAt(renderer.render(floor, player), merchant), ' ');
+        floor.markSeen(merchant.x(), merchant.y());
+        expect("본 적 있는 상인은 보임", charAt(renderer.render(floor, player), merchant), Shop.MERCHANT_SYMBOL);
+        floor.setVisible(merchant.x(), merchant.y());
+        expect("보이는 상인", charAt(renderer.render(floor, player), merchant), Shop.MERCHANT_SYMBOL);
+        expect("상인 색", String.join("", renderer.render(floor, player, Painter.ANSI))
+                .contains(ansi(Style.MERCHANT, String.valueOf(Shop.MERCHANT_SYMBOL))), true);
+        expect("기호 안내의 상인 색", String.join(" ", ConsoleView.formatLegend(List.of(), true, Painter.ANSI))
+                .contains(ansi(Style.MERCHANT, String.valueOf(Shop.MERCHANT_SYMBOL)) + " 상인"), true);
+    }
+
     private static void checkStatusBar() {
         Player player = new Player("테스트", Job.WARRIOR);
         String expectedStart = ConsoleView.bar("HP", player.getStats().getHp(), player.getStats().getMaxHp(), 10);
@@ -212,9 +236,12 @@ public final class MapRendererCheck {
     }
 
     private static void checkLegend() {
-        List<String> empty = ConsoleView.formatLegend(List.of(), Painter.PLAIN);
+        List<String> empty = ConsoleView.formatLegend(List.of(), false, Painter.PLAIN);
         expect("지형 기호 포함", String.join(" ", empty).contains(": 복도"), true);
+        expect("상점이 없으면 상인 없음", String.join(" ", empty).contains("상인"), false);
         expectWithinWidth("기호 안내", empty);
+        expect("상인을 봤으면 상인 표시",
+                String.join(" ", ConsoleView.formatLegend(List.of(), true, Painter.PLAIN)).contains(Shop.MERCHANT_SYMBOL + " 상인"), true);
 
         Position pos = new Position(1, 1);
         List<Monster> monsters = List.of(
@@ -222,12 +249,12 @@ public final class MapRendererCheck {
                 MonsterFactory.create(MonsterType.SLIME, pos),
                 MonsterFactory.create(MonsterType.GOBLIN, pos),
                 MonsterFactory.createBoss(pos));
-        String joined = String.join(" ", ConsoleView.formatLegend(monsters, Painter.PLAIN));
+        String joined = String.join(" ", ConsoleView.formatLegend(monsters, true, Painter.PLAIN));
         expect("층의 몬스터 표시", joined.contains("G 고블린") && joined.contains("S 슬라임"), true);
         expect("같은 종류는 한 번만", joined.indexOf("G 고블린") == joined.lastIndexOf("G 고블린"), true);
         expect("보스는 따로 표시", joined.contains("& 보스 어둠의 파수꾼"), true);
         expect("없는 몬스터는 안 보임", joined.contains("늑대"), false);
-        expectWithinWidth("몬스터 포함 기호 안내", ConsoleView.formatLegend(monsters, Painter.PLAIN));
+        expectWithinWidth("몬스터·상인 포함 기호 안내", ConsoleView.formatLegend(monsters, true, Painter.PLAIN));
     }
 
     private static void checkMessages() {
@@ -314,9 +341,9 @@ public final class MapRendererCheck {
                 MonsterFactory.create(MonsterType.SHADOW_KNIGHT, pos),
                 MonsterFactory.create(MonsterType.SKELETON, pos),
                 MonsterFactory.createBoss(pos));
-        List<String> legend = ConsoleView.formatLegend(monsters, Painter.ANSI);
+        List<String> legend = ConsoleView.formatLegend(monsters, true, Painter.ANSI);
         expect("기호 안내: 색 코드를 지우면 같음", legend.stream().map(Painter::strip).toList(),
-                ConsoleView.formatLegend(monsters, Painter.PLAIN));
+                ConsoleView.formatLegend(monsters, true, Painter.PLAIN));
         expectWithinWidth("색 입힌 기호 안내", legend);
         String joined = String.join(" ", legend);
         expect("기호 안내: 몬스터 기호 색", joined.contains(ansi(Style.MONSTER, "G") + " 고블린"), true);
@@ -328,6 +355,36 @@ public final class MapRendererCheck {
 
     private static String ansi(Style style, String text) {
         return Painter.ANSI.paint(style, text);
+    }
+
+    /** 상점 화면 줄: 이름·가격 칸 정렬, 치료 안내, 장착 장비, 화면 너비. */
+    private static void checkShopLines() {
+        Item sword = ItemFactory.createById("IRON_SWORD");
+        Item potion = ItemFactory.createById("HP_POTION_S");
+        String swordLine = ConsoleView.formatShopLine(1, sword, sword.getPrice());
+        String potionLine = ConsoleView.formatShopLine(12, potion, Shop.sellPrice(potion));
+        expect("상품 줄", swordLine.strip(), "1) 철 검" + " ".repeat(11) + "50골드");
+        expect("가격 칸이 맞춰짐", ConsoleView.displayWidth(swordLine), ConsoleView.displayWidth(potionLine));
+        expect("가장 긴 이름도 칸 안에 들어감", potionLine.contains("물약 "), true);
+
+        Shop shop = Shop.open(3, new Position(1, 1));
+        expect("치료 안내", ConsoleView.formatHealLine(shop), "30골드로 최대 HP 의 50% 회복 (상점마다 1회)");
+
+        Player player = new Player("테스트", Job.WARRIOR);
+        expect("장비 없음", ConsoleView.formatEquipment(player), List.of("장착 무기    없음", "장착 방어구  없음"));
+        player.getInventory().add(sword);
+        player.equip(sword);
+        expect("장착한 무기", ConsoleView.formatEquipment(player).get(0), "장착 무기    철 검(공격력 +3)");
+        Item plate = ItemFactory.createById("GUARDIAN_PLATE");
+        player.getInventory().add(plate);
+        player.equip(plate);
+        expectWithinWidth("가장 긴 방어구", ConsoleView.formatEquipment(player));
+
+        for (String id : List.of("GUARDIAN_PLATE", "HP_POTION_L", "MP_POTION_L")) {
+            Item item = ItemFactory.createById(id);
+            expectWithinWidth("상품 줄 " + id,
+                    List.of(ConsoleView.formatShopLine(5, item, item.getPrice()) + item.getEffectText()));
+        }
     }
 
     private static void expectWithinWidth(String name, List<String> lines) {

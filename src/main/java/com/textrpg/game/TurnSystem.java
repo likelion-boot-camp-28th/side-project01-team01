@@ -22,7 +22,7 @@ import com.textrpg.monster.MonsterType;
  * 탐험 중 한 턴을 처리한다: 플레이어 행동 → (턴을 썼으면) 몬스터 행동 → 턴 마무리.
  * 턴 순서를 이 클래스 한곳에서 정하므로 GameManager 는 playTurn() 결과만 보고 화면을 바꾼다.
  *
- * <p>가방 보기(INVENTORY), 도움말(HELP), 로그 보기(LOG), 저장 후 종료(SAVE_QUIT)는 턴을 쓰지 않는 화면 명령이라
+ * <p>가방 보기(INVENTORY), 도움말(HELP), 로그 보기(LOG), 상인과 대화(TALK), 저장 후 종료(SAVE_QUIT)는 턴을 쓰지 않는 화면 명령이라
  * GameManager 가 직접 처리하고 이 클래스로 넘기지 않는다.
  *
  * <p>턴을 쓰지 못한 행동(NO_TURN)은 이유를 MessageLog 에 남긴다. 아무 반응이 없으면 입력이 무시된 것처럼 보이기 때문이다.
@@ -49,10 +49,10 @@ public class TurnSystem {
      *   <li>턴 마무리: ctx.nextTurn(), 자연 회복. 계단을 내려간 턴(DESCENDED)도 턴 수에 넣는다</li>
      * </ol>
      *
-     * @param cmd 실행할 명령. INVENTORY, HELP, LOG, SAVE_QUIT 는 받지 않는다
+     * @param cmd 실행할 명령. INVENTORY, HELP, LOG, TALK, SAVE_QUIT 는 받지 않는다
      * @param ctx 이번 탐험의 컨텍스트
      * @return 턴 결과. NO_TURN 이면 몬스터는 움직이지 않고 턴 수도 그대로다
-     * @throws IllegalArgumentException 화면 명령(INVENTORY, HELP, LOG, SAVE_QUIT)을 넘겼을 때
+     * @throws IllegalArgumentException 화면 명령(INVENTORY, HELP, LOG, TALK, SAVE_QUIT)을 넘겼을 때
      */
     public TurnOutcome playTurn(Command cmd, GameContext ctx) {
         deathCause = "";
@@ -88,7 +88,7 @@ public class TurnSystem {
             case DROP -> drop(cmd.itemIndex(), ctx);
             case DESCEND -> descend(ctx);
             case WAIT -> TurnOutcome.TURN_USED;
-            case INVENTORY, HELP, LOG, SAVE_QUIT -> throw new IllegalArgumentException(
+            case INVENTORY, HELP, LOG, TALK, SAVE_QUIT -> throw new IllegalArgumentException(
                     "턴을 쓰지 않는 화면 명령은 GameManager 가 처리합니다: " + cmd.type());
         };
     }
@@ -97,7 +97,9 @@ public class TurnSystem {
      * 한 칸 이동한다. 그 칸에 몬스터가 있으면 이동 대신 공격한다.
      * 골드·아이템이 있는 칸에 들어가면 턴을 더 쓰지 않고 자동으로 줍는다 (가방이 가득 차면 안내만 하고 바닥에 남김).
      *
-     * @return 벽이면 NO_TURN, 이동·공격이면 TURN_USED, 공격으로 보스를 쓰러뜨리면 VICTORY
+     * 상인이 있는 칸으로는 들어갈 수 없고, 대화하는 방법만 알려 준다.
+     *
+     * @return 벽·상인이면 NO_TURN, 이동·공격이면 TURN_USED, 공격으로 보스를 쓰러뜨리면 VICTORY
      */
     private TurnOutcome tryMove(Direction d, GameContext ctx) {
         Player player = ctx.getPlayer();
@@ -107,6 +109,10 @@ public class TurnSystem {
         Monster target = floor.getMonsterAt(next);
         if (target != null) {
             return attack(target, ctx);
+        }
+        if (floor.isMerchantAt(next)) {
+            ctx.getLog().add("상인이 있습니다. t 를 누르면 상점을 이용할 수 있습니다.");
+            return TurnOutcome.NO_TURN;
         }
         if (!floor.isWalkable(next)) {
             ctx.getLog().add("벽에 막혀 움직일 수 없습니다.");

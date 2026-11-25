@@ -15,6 +15,7 @@ public enum CommandType {
     SAVE_QUIT(false),
     HELP(false),
     LOG(false),
+    TALK(false),
     WAIT(false);
 
     private final boolean itemCommand;

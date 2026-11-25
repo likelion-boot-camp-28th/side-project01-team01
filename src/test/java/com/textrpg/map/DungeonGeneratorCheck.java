@@ -1,9 +1,12 @@
 package com.textrpg.map;
 
+import com.textrpg.core.Direction;
 import com.textrpg.core.Position;
 import com.textrpg.item.FloorItem;
+import com.textrpg.item.Item;
 import com.textrpg.monster.Boss;
 import com.textrpg.monster.Monster;
+import com.textrpg.shop.Shop;
 import com.textrpg.util.RandomUtil;
 
 import java.util.ArrayList;
@@ -29,6 +32,8 @@ public final class DungeonGeneratorCheck {
 
     private static int passed;
     private static int failed;
+    /** 층마다 상점이 나온 횟수. 상점 확률 확인용. */
+    private static final int[] shopCounts = new int[DungeonGenerator.MAX_FLOOR + 1];
 
     private DungeonGeneratorCheck() {
     }
@@ -43,9 +48,11 @@ public final class DungeonGeneratorCheck {
                 checkRooms(f, where);
                 checkGoal(f, level, where);
                 checkEntities(f, where);
+                checkShop(f, level, where);
                 checkSaveRoundTrip(f, level, where);
             }
         }
+        checkShopRate();
         checkInvalidSave();
 
         System.out.println("통과 " + passed + " / 실패 " + failed);
@@ -122,6 +129,10 @@ public final class DungeonGeneratorCheck {
         }
 
         for (Room r : rooms) {
+            // 상점방 중심에는 상인이 서 있으므로 그 방은 checkShop 에서 상인 옆 칸으로 확인한다
+            if (r == f.shopRoom()) {
+                continue;
+            }
             check(DungeonGenerator.isReachable(f, f.getStartPos(), r.center()), where,
                     "방 중심에 도달하지 못함: " + r);
         }
@@ -177,6 +188,60 @@ public final class DungeonGeneratorCheck {
             }
             for (FloorItem item : items) {
                 check(!startRoom.contains(item.pos()), where, "시작 방에 아이템 있음: " + item.pos());
+            }
+        }
+    }
+
+    /**
+     * 상점 규칙: Shop.MIN_FLOOR 층부터만, 시작 방·마지막 방(계단·보스)이 아닌 방 중심에 상인,
+     * 상점방에는 몬스터·아이템·골드 없음, 상인 칸은 지나갈 수 없고 상인 옆 칸에는 걸어갈 수 있음, 진열 상품 STOCK_SIZE 개.
+     */
+    private static void checkShop(Floor f, int level, String where) {
+        if (f.getShop().isEmpty()) {
+            return;
+        }
+        shopCounts[level]++;
+        check(level >= Shop.MIN_FLOOR, where, Shop.MIN_FLOOR + "층보다 얕은 층에 상점이 있음");
+        Shop shop = f.getShop().get();
+        Position merchant = shop.getMerchantPos();
+        Room shopRoom = f.shopRoom();
+        List<Room> rooms = f.getRooms();
+        check(shopRoom != null && merchant.equals(shopRoom.center()), where, "상인이 방 중심에 없음: " + merchant);
+        check(shopRoom != rooms.get(0) && shopRoom != rooms.get(rooms.size() - 1), where,
+                "시작 방이나 마지막 방이 상점방: " + shopRoom);
+        check(!f.isWalkable(merchant) && !f.isFree(merchant), where, "상인 칸을 지나갈 수 있음: " + merchant);
+        if (shopRoom != null) {
+            for (Monster m : f.getMonsters()) {
+                check(!shopRoom.contains(m.getPos()), where, "상점방에 몬스터 있음: " + m.getPos());
+            }
+            for (FloorItem item : f.getItems()) {
+                check(!shopRoom.contains(item.pos()), where, "상점방에 아이템·골드 있음: " + item.pos());
+            }
+        }
+        boolean canTalk = false;
+        for (Direction d : Direction.values()) {
+            Position side = merchant.move(d);
+            canTalk |= f.isWalkable(side) && DungeonGenerator.isReachable(f, f.getStartPos(), side);
+        }
+        check(canTalk, where, "상인 옆 칸에 걸어갈 수 없음: " + merchant);
+
+        List<Item> stock = shop.getStock();
+        check(stock.size() == Shop.STOCK_SIZE, where, "진열 상품이 " + Shop.STOCK_SIZE + "개가 아님: " + stock.size());
+        for (Item item : stock) {
+            check(item.canDropOn(level) || item.canDropOn(level + 1), where,
+                    "이 층이나 다음 층에서 나오지 않는 상품: " + item.getId());
+        }
+    }
+
+    /** 층마다 SEEDS_PER_FLOOR 번 중 상점이 나온 비율이 Shop.APPEAR_PERCENT 근처인지 (±7%p). */
+    private static void checkShopRate() {
+        for (int level = 1; level <= DungeonGenerator.MAX_FLOOR; level++) {
+            double percent = shopCounts[level] * 100.0 / SEEDS_PER_FLOOR;
+            if (level < Shop.MIN_FLOOR) {
+                check(shopCounts[level] == 0, level + "층", "상점이 나옴: " + shopCounts[level] + "번");
+            } else {
+                check(Math.abs(percent - Shop.APPEAR_PERCENT) <= 7, level + "층",
+                        "상점 비율이 " + Shop.APPEAR_PERCENT + "% 근처가 아님: " + percent + "%");
             }
         }
     }
