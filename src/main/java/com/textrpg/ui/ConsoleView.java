@@ -10,6 +10,7 @@ import com.textrpg.entity.Player;
 import com.textrpg.entity.Stats;
 import com.textrpg.item.Inventory;
 import com.textrpg.item.Item;
+import com.textrpg.item.ItemType;
 import com.textrpg.map.Floor;
 import com.textrpg.meta.Profile;
 import com.textrpg.meta.RunResult;
@@ -20,6 +21,9 @@ import com.textrpg.monster.MonsterType;
 /**
  * 모든 콘솔 출력의 단일 창구. 다른 클래스는 System.out 을 직접 쓰지 않는다.
  * 맵·상태줄 렌더링(render, printStatusBar 등)은 A 파트가 이 클래스에 추가한다.
+ *
+ * <p>색(ANSI)을 켜면 지도의 몬스터·아이템, 기호 안내, HP·MP 막대, 화면 제목, 가방 아이템 이름에 색을 입힌다.
+ * 색은 Style 에서 관리하고, 너비 계산(displayWidth)은 색 코드를 빼고 센다.
  */
 public class ConsoleView {
 
@@ -33,17 +37,30 @@ public class ConsoleView {
     private static final int LOG_SCREEN_MESSAGES = 30;
     private static final String MESSAGE_PREFIX = "> ";
     private static final String LEGEND_SEPARATOR = "  ";
-    /** 탐험 화면에 항상 보여 줄 지형·아이템 기호. 몬스터 기호는 층에 있는 종류만 덧붙인다. */
-    private static final List<String> FIXED_LEGEND = List.of(
-            "@ 나", "# 벽", ": 복도", "+ 문", "> 계단", "$ 골드", "! 물약", ") 무기", "[ 방어구");
+    /** 탐험 화면에 항상 보여 줄 지형·아이템 기호. 몬스터 기호는 층에 있는 종류만 덧붙인다. 기호 색은 지도와 같다. */
+    private static final List<LegendEntry> FIXED_LEGEND = List.of(
+            new LegendEntry('@', "나", Style.PLAYER),
+            new LegendEntry('#', "벽", null),
+            new LegendEntry(':', "복도", null),
+            new LegendEntry('+', "문", Style.DOOR),
+            new LegendEntry('>', "계단", Style.STAIRS),
+            new LegendEntry('$', "골드", Style.GOLD),
+            new LegendEntry('!', "물약", Style.POTION),
+            new LegendEntry(')', "무기", Style.EQUIPMENT),
+            new LegendEntry('[', "방어구", Style.EQUIPMENT));
     private static final int BAR_WIDTH = 10;
 
     private final boolean ansiClear;
+    private final Painter painter;
     private final MapRenderer mapRenderer = new MapRenderer();
 
-    /** @param ansiClear true 면 ANSI 코드로 화면을 지우고, false 면 빈 줄로 밀어낸다(IntelliJ 콘솔용). */
-    public ConsoleView(boolean ansiClear) {
+    /**
+     * @param ansiClear true 면 ANSI 코드로 화면을 지우고, false 면 빈 줄로 밀어낸다(IntelliJ 콘솔용).
+     * @param color     true 면 ANSI 색을 입힌다. IntelliJ 실행 콘솔도 색은 지원하므로 ansiClear 와 따로 정한다.
+     */
+    public ConsoleView(boolean ansiClear, boolean color) {
         this.ansiClear = ansiClear;
+        this.painter = color ? Painter.ANSI : Painter.PLAIN;
     }
 
     public void clearScreen() {
@@ -64,8 +81,12 @@ public class ConsoleView {
     }
 
     public void printTitle(String title) {
+        printTitle(title, Style.TITLE);
+    }
+
+    private void printTitle(String title, Style style) {
         printDivider();
-        System.out.println("  " + title);
+        System.out.println("  " + painter.paint(style, title));
         printDivider();
     }
 
@@ -90,7 +111,7 @@ public class ConsoleView {
 
         clearScreen();
         printLine(formatHeader(floor.getLevel(), ctx.getTurn()));
-        for (String line : mapRenderer.render(floor, player)) {
+        for (String line : mapRenderer.render(floor, player, painter)) {
             printLine(line);
         }
         printStatusBar(player);
@@ -98,7 +119,7 @@ public class ConsoleView {
         List<Monster> visibleMonsters = floor.getMonsters().stream()
                 .filter(m -> floor.isVisible(m.getPos().x(), m.getPos().y()))
                 .toList();
-        for (String line : formatLegend(visibleMonsters)) {
+        for (String line : formatLegend(visibleMonsters, painter)) {
             printLine(line);
         }
         printDivider();
@@ -124,7 +145,7 @@ public class ConsoleView {
 
     /** 기획서 1.1 의 상태줄 한 줄: HP 막대, MP, 레벨, 공격, 방어, 골드. */
     public void printStatusBar(Player player) {
-        printLine(formatStatusBar(player));
+        printLine(formatStatusBar(player, painter));
     }
 
     /** 가방 목록. 번호는 1부터 보여 준다 (입력 u 1 → index 0). 빈 가방이면 안내 문장. */
@@ -136,7 +157,8 @@ public class ConsoleView {
         }
         List<Item> items = inventory.getItems();
         for (int i = 0; i < items.size(); i++) {
-            printLine((i + 1) + ") " + items.get(i).getDisplayName());
+            Item item = items.get(i);
+            printLine((i + 1) + ") " + painter.paint(itemStyle(item.getType()), item.getDisplayName()));
         }
         printDivider();
         printLine("u 번호: 사용   e 번호: 장착   x 번호: 버리기");
@@ -192,7 +214,7 @@ public class ConsoleView {
      * @param shardBreakdown ShardCalculator.breakdown() 결과 (항목별 파편 내역)
      */
     public void printRunResult(RunResult result, List<String> shardBreakdown) {
-        printTitle(formatResultTitle(result));
+        printTitle(formatResultTitle(result), result.isVictory() ? Style.VICTORY : Style.DEFEAT);
         printLine(formatResultSummary(result));
         printLine("");
         printLine("획득 파편");
@@ -203,20 +225,32 @@ public class ConsoleView {
     }
 
     /**
-     * 탐험 화면의 기호 안내. 지형·아이템 기호는 항상, 몬스터는 이 층에 있는 종류만 보여 준다.
+     * 탐험 화면의 기호 안내. 지형·아이템 기호는 항상, 몬스터는 넘겨받은 종류만 보여 준다.
      * 보스는 일반 몬스터와 헷갈리지 않게 "보스" 를 붙인다. 화면 너비를 넘으면 기호 단위로 줄을 나눈다.
+     * 기호는 지도와 같은 색으로 칠한다.
      */
-    static List<String> formatLegend(List<Monster> monsters) {
-        List<String> items = new ArrayList<>(FIXED_LEGEND);
+    static List<String> formatLegend(List<Monster> monsters, Painter painter) {
+        List<LegendEntry> entries = new ArrayList<>(FIXED_LEGEND);
         monsters.stream()
                 .map(Monster::getType)
                 .distinct()
                 .sorted(Comparator.naturalOrder())
                 .map(type -> type == MonsterType.ABYSS_WARDEN
-                        ? type.getSymbol() + " 보스 " + type.getDisplayName()
-                        : type.getSymbol() + " " + type.getDisplayName())
-                .forEach(items::add);
+                        ? new LegendEntry(type.getSymbol(), "보스 " + type.getDisplayName(), Style.BOSS)
+                        : new LegendEntry(type.getSymbol(), type.getDisplayName(), Style.MONSTER))
+                .forEach(entries::add);
+        List<String> items = entries.stream().map(entry -> entry.format(painter)).toList();
         return wrap(items, LEGEND_SEPARATOR, SCREEN_WIDTH, "");
+    }
+
+    /** 아이템 종류별 색. 지도 기호, 기호 안내, 가방 목록이 같이 쓴다. */
+    static Style itemStyle(ItemType type) {
+        return switch (type) {
+            case WEAPON, ARMOR -> Style.EQUIPMENT;
+            case POTION -> Style.POTION;
+            case GOLD -> Style.GOLD;
+            case SCROLL, FOOD -> Style.OTHER_ITEM;
+        };
     }
 
     /**
@@ -291,10 +325,10 @@ public class ConsoleView {
         return parts;
     }
 
-    /** 터미널에서 차지하는 칸 수. 한글·한자 등 전각 문자는 두 칸으로 센다. */
+    /** 터미널에서 차지하는 칸 수. 한글·한자 등 전각 문자는 두 칸으로 세고, 색 코드는 세지 않는다. */
     static int displayWidth(String text) {
         int width = 0;
-        for (char c : text.toCharArray()) {
+        for (char c : Painter.strip(text).toCharArray()) {
             width += charWidth(c);
         }
         return width;
@@ -344,15 +378,26 @@ public class ConsoleView {
         return " " + GAME_TITLE + " - 지하 " + floorLevel + "층  |  턴 " + turn;
     }
 
-    /** 예: "HP 32/40 [########--]  MP 5/10  Lv.3  공격 9  방어 4  골드 57". 공격·방어는 장비를 합산한 값. */
-    static String formatStatusBar(Player player) {
+    /**
+     * 예: "HP 32/40 [########--]  MP 5/10  Lv.3  공격 9  방어 4  골드 57". 공격·방어는 장비를 합산한 값.
+     * 색을 쓰면 HP 막대는 남은 비율에 따라 초록(절반 이상)·노랑(4분의 1 이상)·빨강, MP 는 파랑, 골드는 노랑이다.
+     */
+    static String formatStatusBar(Player player, Painter painter) {
         Stats stats = player.getStats();
-        return bar("HP", stats.getHp(), stats.getMaxHp(), BAR_WIDTH)
-                + "  MP " + stats.getMp() + "/" + stats.getMaxMp()
+        return painter.paint(hpStyle(stats.getHp(), stats.getMaxHp()), bar("HP", stats.getHp(), stats.getMaxHp(), BAR_WIDTH))
+                + "  " + painter.paint(Style.MP, "MP " + stats.getMp() + "/" + stats.getMaxMp())
                 + "  Lv." + player.getLevel()
                 + "  공격 " + player.getAttack()
                 + "  방어 " + player.getDefense()
-                + "  골드 " + player.getGold();
+                + "  " + painter.paint(Style.GOLD, "골드 " + player.getGold());
+    }
+
+    /** HP 막대 색. 절반 이상 초록, 4분의 1 이상 노랑, 그 아래 빨강. */
+    static Style hpStyle(int hp, int maxHp) {
+        if (hp * 2 >= maxHp) {
+            return Style.HP_HIGH;
+        }
+        return hp * 4 >= maxHp ? Style.HP_MID : Style.HP_LOW;
     }
 
     /** "HP 32/40 [########--]" 형태의 막대. */
@@ -360,5 +405,14 @@ public class ConsoleView {
         int filled = max <= 0 ? 0 : (int) Math.round((double) current / max * width);
         filled = Math.max(0, Math.min(width, filled));
         return label + " " + current + "/" + max + " [" + "#".repeat(filled) + "-".repeat(width - filled) + "]";
+    }
+
+    /** 기호 안내 한 칸. 예: "$ 골드" (기호만 색을 입힌다). style 이 null 이면 기본 글자색. */
+    private record LegendEntry(char symbol, String label, Style style) {
+
+        String format(Painter painter) {
+            String mark = String.valueOf(symbol);
+            return (style == null ? mark : painter.paint(style, mark)) + " " + label;
+        }
     }
 }

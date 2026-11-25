@@ -161,6 +161,8 @@ classDiagram
     class ConsoleView {
         -MapRenderer mapRenderer
         -boolean ansiClear
+        -Painter painter
+        +ConsoleView(boolean ansiClear, boolean color)
         +clearScreen()
         +render(GameContext ctx)
         +printStatusBar(Player p)
@@ -174,7 +176,31 @@ classDiagram
     }
     class MapRenderer {
         +render(Floor f, Player p) List~String~
-        -symbolAt(Floor f, Player p, int x, int y) char
+        ~render(Floor f, Player p, Painter painter) List~String~
+        -glyphAt(Floor f, Player p, int x, int y) Glyph
+    }
+    class Style {
+        <<enumeration>>
+        PLAYER
+        MONSTER
+        BOSS
+        GOLD
+        POTION
+        EQUIPMENT
+        STAIRS
+        REMEMBERED
+        HP_HIGH
+        HP_MID
+        HP_LOW
+        ...
+        -String code
+    }
+    class Painter {
+        <<enumeration>>
+        PLAIN
+        ANSI
+        ~paint(Style style, String text) String
+        ~strip(String text)$ String
     }
     class InputHandler {
         -Scanner scanner
@@ -200,11 +226,16 @@ classDiagram
     CommandParser ..> Command : creates
     Command --> CommandType
     ConsoleView --> MapRenderer
+    ConsoleView --> Painter
+    MapRenderer ..> Painter
+    Painter ..> Style
 ```
 
 > 턴 순서(플레이어 행동 → 몬스터 행동 → 턴 마무리)는 `TurnSystem.playTurn()` 한곳에서 정한다. `INVENTORY`, `HELP`, `SAVE_QUIT`은 턴을 쓰지 않는 화면 명령이라 `GameManager`가 처리한다. 사망 원인은 `playTurn()`이 `DIED`를 돌려준 직후 `getDeathCause()`로 읽는다.
 >
-> `MapRenderer.symbolAt()` 우선순위: 플레이어 `@` → 몬스터 기호 → 바닥 아이템 기호 → 타일 기호. 시야에 따라 안 본 칸은 공백, 본 적 있지만 지금 안 보이는 칸은 타일만(몬스터·아이템 숨김). 기호 안내에도 지금 보이는 몬스터만 넣는다.
+> `MapRenderer.glyphAt()` 우선순위: 플레이어 `@` → 몬스터 기호 → 바닥 아이템 기호 → 타일 기호. 시야에 따라 안 본 칸은 공백, 본 적 있지만 지금 안 보이는 칸은 타일만(몬스터·아이템 숨김). 기호 안내에도 지금 보이는 몬스터만 넣는다.
+>
+> 색(P2): 칸마다 `Style`을 정하고 `Painter.ANSI`가 ANSI 색 코드로 감싼다. 몬스터 빨강, 보스 굵은 자홍, 아이템은 종류별(골드 노랑, 물약 초록, 무기·방어구 청록), 본 적만 있는 칸 회색, 계단은 기억한 칸이어도 초록. `--no-color` 또는 환경 변수 `NO_COLOR`면 `Painter.PLAIN`(색 없음). 너비 계산(`ConsoleView.displayWidth`)은 색 코드를 빼고 센다. 인자 없는 `render(f, p)`는 색 없는 글자를 돌려준다 (확인용·다른 파트용).
 >
 > 연속 이동(`dddd`)은 이번 턴에 피해를 입었거나, 전에 안 보이던 몬스터가 보이게 됐거나, 몬스터가 바로 옆에 있으면 남은 이동을 버린다 (`GameManager.isInterrupted`).
 
@@ -722,7 +753,7 @@ classDiagram
 | `revealAll()` | **P1**. 모든 칸을 `seen`으로 표시 (지도 두루마리) | B |
 | `exportTiles()` / `exportSeen()` / `exportRooms()` | 세이브용 문자열. `exportRooms()`는 방마다 `x,y,width,height` 한 줄 | A |
 
-> `MapRenderer.symbolAt()`은 `seen`/`visible`을 보고 그린다: 안 본 칸은 공백, 본 적만 있는 칸은 타일만, 보이는 칸은 몬스터·아이템까지.
+> `MapRenderer.glyphAt()`은 `seen`/`visible`을 보고 그린다: 안 본 칸은 공백, 본 적만 있는 칸은 타일만, 보이는 칸은 몬스터·아이템까지.
 
 ### 5.2 Tile · Room 규칙
 

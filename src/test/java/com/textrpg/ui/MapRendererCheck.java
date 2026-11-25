@@ -9,6 +9,8 @@ import com.textrpg.core.Position;
 import com.textrpg.entity.Job;
 import com.textrpg.entity.Player;
 import com.textrpg.item.FloorItem;
+import com.textrpg.item.ItemFactory;
+import com.textrpg.item.ItemType;
 import com.textrpg.map.DungeonGenerator;
 import com.textrpg.map.FieldOfView;
 import com.textrpg.map.Floor;
@@ -19,7 +21,7 @@ import com.textrpg.monster.MonsterFactory;
 import com.textrpg.monster.MonsterType;
 
 /**
- * MapRenderer(시야 포함)와 ConsoleView 의 문자열 생성(formatHeader, formatStatusBar, 결과 화면, 기호 안내, 메시지 줄바꿈) 확인용.
+ * MapRenderer(시야·색 포함)와 ConsoleView 의 문자열 생성(formatHeader, formatStatusBar, 결과 화면, 기호 안내, 메시지 줄바꿈, 색) 확인용.
  * JUnit 대신 main 으로 실행한다 (Team_Rules 2.11). 실패가 하나라도 있으면 종료 코드 1.
  */
 public final class MapRendererCheck {
@@ -42,6 +44,8 @@ public final class MapRendererCheck {
         checkRunResult();
         checkLegend();
         checkMessages();
+        checkMapColors();
+        checkTextColors();
 
         System.out.println("통과 " + passed + " / 실패 " + failed);
         if (failed > 0) {
@@ -169,7 +173,7 @@ public final class MapRendererCheck {
     private static void checkStatusBar() {
         Player player = new Player("테스트", Job.WARRIOR);
         String expectedStart = ConsoleView.bar("HP", player.getStats().getHp(), player.getStats().getMaxHp(), 10);
-        String line = ConsoleView.formatStatusBar(player);
+        String line = ConsoleView.formatStatusBar(player, Painter.PLAIN);
 
         expect("HP 막대로 시작", line.startsWith(expectedStart), true);
         expect("MP", line.contains("MP " + player.getStats().getMp() + "/" + player.getStats().getMaxMp()), true);
@@ -179,7 +183,7 @@ public final class MapRendererCheck {
         expect("골드", line.contains("골드 " + player.getGold()), true);
 
         player.takeDamage(player.getStats().getMaxHp());
-        expect("HP 0 이면 빈 막대", ConsoleView.formatStatusBar(player).contains("[----------]"), true);
+        expect("HP 0 이면 빈 막대", ConsoleView.formatStatusBar(player, Painter.PLAIN).contains("[----------]"), true);
         expect("막대 32/40", ConsoleView.bar("HP", 32, 40, 10), "HP 32/40 [########--]");
     }
 
@@ -208,7 +212,7 @@ public final class MapRendererCheck {
     }
 
     private static void checkLegend() {
-        List<String> empty = ConsoleView.formatLegend(List.of());
+        List<String> empty = ConsoleView.formatLegend(List.of(), Painter.PLAIN);
         expect("지형 기호 포함", String.join(" ", empty).contains(": 복도"), true);
         expectWithinWidth("기호 안내", empty);
 
@@ -218,12 +222,12 @@ public final class MapRendererCheck {
                 MonsterFactory.create(MonsterType.SLIME, pos),
                 MonsterFactory.create(MonsterType.GOBLIN, pos),
                 MonsterFactory.createBoss(pos));
-        String joined = String.join(" ", ConsoleView.formatLegend(monsters));
+        String joined = String.join(" ", ConsoleView.formatLegend(monsters, Painter.PLAIN));
         expect("층의 몬스터 표시", joined.contains("G 고블린") && joined.contains("S 슬라임"), true);
         expect("같은 종류는 한 번만", joined.indexOf("G 고블린") == joined.lastIndexOf("G 고블린"), true);
         expect("보스는 따로 표시", joined.contains("& 보스 어둠의 파수꾼"), true);
         expect("없는 몬스터는 안 보임", joined.contains("늑대"), false);
-        expectWithinWidth("몬스터 포함 기호 안내", ConsoleView.formatLegend(monsters));
+        expectWithinWidth("몬스터 포함 기호 안내", ConsoleView.formatLegend(monsters, Painter.PLAIN));
     }
 
     private static void checkMessages() {
@@ -249,6 +253,81 @@ public final class MapRendererCheck {
         expect("넘치면 생략 안내", lines.get(0).contains("3개 생략"), true);
         expect("최근 것만 표시", lines.get(lines.size() - 1), "> [2턴] m7");
         expect("새 메시지가 없으면 빈 줄 없음", ConsoleView.formatNewMessages(List.of()), List.of());
+    }
+
+    /** 색을 입혀도 글자는 같고(색 코드만 더해짐), 몬스터·아이템·플레이어·기억한 칸이 각자 색을 가진다. */
+    private static void checkMapColors() {
+        Floor floor = visibleTestFloor();
+        Player player = playerAtStart(floor);
+        List<Position> free = freeFloorPositions(floor, player, 3);
+        floor.addMonster(MonsterFactory.create(MonsterType.GOBLIN, free.get(0)));
+        floor.addItem(FloorItem.gold(10, free.get(1)));
+        floor.addItem(FloorItem.of(ItemFactory.createById("HP_POTION_S"), free.get(2)));
+        MapRenderer renderer = new MapRenderer();
+
+        List<String> plain = renderer.render(floor, player);
+        List<String> colored = renderer.render(floor, player, Painter.ANSI);
+        expect("PLAIN 은 색 코드 없음", String.join("", renderer.render(floor, player, Painter.PLAIN)).contains("\033"), false);
+        expect("색 코드를 지우면 같은 글자", colored.stream().map(Painter::strip).toList(), plain);
+        String all = String.join("\n", colored);
+        expect("플레이어는 굵게", all.contains(ansi(Style.PLAYER, "@")), true);
+        expect("몬스터는 빨강", all.contains(ansi(Style.MONSTER, "G")), true);
+        expect("골드는 노랑", all.contains(ansi(Style.GOLD, "$")), true);
+        expect("물약은 초록", all.contains(ansi(Style.POTION, "!")), true);
+        expect("계단 색", all.contains(ansi(Style.STAIRS, ">")), true);
+        expect("보이는 바닥은 기본색", all.contains(ansi(Style.REMEMBERED, ".")), false);
+
+        Floor fog = DungeonGenerator.createTestFloor();
+        Player walker = playerAtStart(fog);
+        Position remembered = freeFloorPositions(fog, walker, 1).get(0);
+        fog.markSeen(remembered.x(), remembered.y());
+        fog.getStairs().ifPresent(st -> fog.markSeen(st.x(), st.y()));
+        String foggy = String.join("\n", renderer.render(fog, walker, Painter.ANSI));
+        expect("기억한 칸은 회색", foggy.contains(ansi(Style.REMEMBERED, ".")), true);
+        expect("기억한 계단도 계단 색", foggy.contains(ansi(Style.STAIRS, ">")), true);
+
+        Position bossPos = freeFloorPositions(floor, player, 1).get(0);
+        floor.addMonster(MonsterFactory.createBoss(bossPos));
+        expect("보스는 따로", String.join("", renderer.render(floor, player, Painter.ANSI)).contains(ansi(Style.BOSS, "&")), true);
+    }
+
+    /** 상태줄·기호 안내의 색, 너비 계산은 색 코드를 세지 않음, HP 색 기준. */
+    private static void checkTextColors() {
+        expect("색 코드는 너비에 안 셈", ConsoleView.displayWidth(Painter.ANSI.paint(Style.GOLD, "골드 5")), 6);
+
+        Player player = new Player("테스트", Job.WARRIOR);
+        String plain = ConsoleView.formatStatusBar(player, Painter.PLAIN);
+        String colored = ConsoleView.formatStatusBar(player, Painter.ANSI);
+        expect("상태줄: 색 코드를 지우면 같음", Painter.strip(colored), plain);
+        expect("상태줄: 너비 같음", ConsoleView.displayWidth(colored), ConsoleView.displayWidth(plain));
+        expect("상태줄: HP 가득이면 초록 막대", colored.startsWith(ansi(Style.HP_HIGH, ConsoleView.bar("HP", 30, 30, 10))), true);
+
+        expect("HP 20/40 은 초록", ConsoleView.hpStyle(20, 40), Style.HP_HIGH);
+        expect("HP 19/40 은 노랑", ConsoleView.hpStyle(19, 40), Style.HP_MID);
+        expect("HP 10/40 은 노랑", ConsoleView.hpStyle(10, 40), Style.HP_MID);
+        expect("HP 9/40 은 빨강", ConsoleView.hpStyle(9, 40), Style.HP_LOW);
+        expect("HP 0 은 빨강", ConsoleView.hpStyle(0, 40), Style.HP_LOW);
+
+        Position pos = new Position(1, 1);
+        List<Monster> monsters = List.of(
+                MonsterFactory.create(MonsterType.GOBLIN, pos),
+                MonsterFactory.create(MonsterType.SHADOW_KNIGHT, pos),
+                MonsterFactory.create(MonsterType.SKELETON, pos),
+                MonsterFactory.createBoss(pos));
+        List<String> legend = ConsoleView.formatLegend(monsters, Painter.ANSI);
+        expect("기호 안내: 색 코드를 지우면 같음", legend.stream().map(Painter::strip).toList(),
+                ConsoleView.formatLegend(monsters, Painter.PLAIN));
+        expectWithinWidth("색 입힌 기호 안내", legend);
+        String joined = String.join(" ", legend);
+        expect("기호 안내: 몬스터 기호 색", joined.contains(ansi(Style.MONSTER, "G") + " 고블린"), true);
+        expect("기호 안내: 보스 기호 색", joined.contains(ansi(Style.BOSS, "&") + " 보스"), true);
+
+        expect("무기 색", ConsoleView.itemStyle(ItemType.WEAPON), Style.EQUIPMENT);
+        expect("물약 색", ConsoleView.itemStyle(ItemType.POTION), Style.POTION);
+    }
+
+    private static String ansi(Style style, String text) {
+        return Painter.ANSI.paint(style, text);
     }
 
     private static void expectWithinWidth(String name, List<String> lines) {

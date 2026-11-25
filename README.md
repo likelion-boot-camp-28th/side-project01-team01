@@ -22,7 +22,8 @@ java -jar build/libs/into-the-dark-0.1.0.jar
 
 | 옵션 | 동작 |
 |---|---|
-| `--no-clear` | 화면 지우기(ANSI) 대신 빈 줄로 밀어낸다. IntelliJ 실행 창처럼 ANSI를 지원하지 않는 콘솔용 |
+| `--no-clear` | 화면 지우기(ANSI) 대신 빈 줄로 밀어낸다. IntelliJ 실행 창처럼 ANSI 화면 지우기를 지원하지 않는 콘솔용 |
+| `--no-color` | 글자 색(ANSI)을 끈다. 환경 변수 `NO_COLOR`가 있어도 꺼진다. `←[31m` 같은 문자가 보이는 오래된 Windows 콘솔용 |
 | `--debug-shards` | 슬롯을 고를 때 파편이 1000보다 적으면 1000으로 채운다 (시연·테스트용) |
 | `--start-floor=N` | 새 탐험을 지하 N층(1~5)에서 시작한다 (시연·테스트용) |
 
@@ -32,7 +33,7 @@ java -jar build/libs/into-the-dark-0.1.0.jar --debug-shards --start-floor=5   # 
 
 - 디버그 옵션이 켜져 있으면 메인 메뉴 제목에 `[디버그]`가 붙는다.
 - 채운 파편도 실제 슬롯에 저장되므로, 테스트는 빈 슬롯에서 하는 것을 권장한다.
-- IntelliJ에서는 실행 구성의 Program arguments에 옵션을 넣는다.
+- IntelliJ에서는 실행 구성의 Program arguments에 옵션을 넣는다. IntelliJ 실행 창은 화면 지우기는 안 되지만 색은 나오므로 `--no-clear`만 주면 된다.
 
 ## 게임 흐름
 
@@ -76,6 +77,8 @@ java -jar build/libs/into-the-dark-0.1.0.jar --debug-shards --start-floor=5   # 
 | `:` | 복도 | `$` | 골드 |
 | `+` | 문 | 영문자 | 몬스터 (`S` 슬라임, `W` 늑대 등) |
 | `>` | 아래층 계단 | `&` | 보스: 어둠의 파수꾼 (지하 5층) |
+
+색(`--no-color`가 아닐 때): 몬스터 빨강, 보스 굵은 자홍, 골드 노랑, 물약 초록, 무기·방어구 청록, 계단 초록, 문 노랑, 플레이어 굵게. 지금 보이는 방은 기본 글자색, 본 적만 있는 곳은 회색이다. HP 막대는 절반 이상 초록, 4분의 1 이상 노랑, 그 아래 빨강. 색은 `ui.Style` 한 곳에서 바꾼다.
 
 ### 직업
 
