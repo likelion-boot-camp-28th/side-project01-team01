@@ -49,6 +49,7 @@ public class GameManager {
 
     private static final String COMMAND_PROMPT = "명령 (w/a/s/d 이동, i 가방, l 로그, > 내려가기, ? 도움말): ";
     private static final String PRESS_ENTER = "Enter 를 누르면 돌아갑니다.";
+    private static final String INVENTORY_PROMPT = "명령 (u/e/x 번호, Enter: 돌아가기): ";
     private static final int MAX_NAME_LENGTH = 12;
     /** 이름을 비워 두면 쓰는 기본 이름. */
     private static final String DEFAULT_NAME = "모험가";
@@ -344,6 +345,37 @@ public class GameManager {
         return next;
     }
 
+    /**
+     * 가방 화면 (i). 여기서 u/e/x 번호를 입력하면 그 명령을 한 턴으로 실행하고 탐험 화면으로 돌아간다.
+     * 몬스터도 그 턴에 움직이므로 결과는 탐험 화면에서 본다. 빈 입력이면 턴을 쓰지 않고 돌아간다.
+     *
+     * @return 아이템 명령을 실행했으면 그 결과(PLAYING, DEAD 등), 그냥 닫았으면 PLAYING
+     */
+    private GameState openInventory() {
+        String error = "";
+        while (true) {
+            view.clearScreen();
+            view.printInventory(run.getPlayer().getInventory());
+            if (!error.isEmpty()) {
+                view.printLine(error);
+            }
+            String line = input.readLine(INVENTORY_PROMPT);
+            if (line.isEmpty()) {
+                return GameState.PLAYING;
+            }
+            List<Command> commands = CommandParser.parse(line);
+            if (commands.size() == 1 && isItemCommand(commands.get(0).type())) {
+                run.getLog().markRead();
+                return runCommands(commands);
+            }
+            error = "가방에서는 u 번호, e 번호, x 번호만 입력할 수 있습니다: " + line;
+        }
+    }
+
+    private static boolean isItemCommand(CommandType type) {
+        return type == CommandType.USE || type == CommandType.EQUIP || type == CommandType.DROP;
+    }
+
     /** 턴을 쓰지 않고 다른 화면을 여는 명령인지. 이 명령들은 CommandParser 가 한 줄에 하나만 만든다. */
     private static boolean isScreenCommand(CommandType type) {
         return type == CommandType.INVENTORY || type == CommandType.HELP
@@ -360,10 +392,7 @@ public class GameManager {
         for (Command cmd : commands) {
             switch (cmd.type()) {
                 case INVENTORY -> {
-                    view.clearScreen();
-                    view.printInventory(run.getPlayer().getInventory());
-                    waitForEnter();
-                    return GameState.PLAYING;
+                    return openInventory();
                 }
                 case HELP -> {
                     view.clearScreen();
