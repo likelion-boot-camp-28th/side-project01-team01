@@ -318,9 +318,9 @@ public class ConsoleView {
         return "사망 - " + result.getDeathCause() + "에게 쓰러졌습니다";
     }
 
-    /** 결과 요약 한 줄. 예: "도달 층 지하 3층  |  처치 14  |  레벨 4  |  골드 57" */
+    /** 결과 요약 한 줄. 예: "지하 3층  |  214턴  |  처치 14  |  레벨 4  |  골드 57" */
     static String formatResultSummary(RunResult result) {
-        return "도달 층 지하 " + result.getDeepestFloor() + "층  |  처치 " + result.getKills()
+        return "지하 " + result.getDeepestFloor() + "층  |  " + result.getTurns() + "턴  |  처치 " + result.getKills()
                 + "  |  레벨 " + result.getFinalLevel() + "  |  골드 " + result.getGold();
     }
 

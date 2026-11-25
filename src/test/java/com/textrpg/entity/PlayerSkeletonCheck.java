@@ -194,13 +194,14 @@ public final class PlayerSkeletonCheck {
         Player p = new Player("용사", Job.WARRIOR);
         p.gainExp(20);
         p.addGold(15);
-        run.finish(p, false, "고블린에게 사망");
+        run.finish(p, 37, false, "고블린에게 사망");
         check("끝난 판 레벨 2, 골드 15 저장", run.getFinalLevel() == 2 && run.getGold() == 15);
         check("끝난 판 패배, 사망 원인 저장",
                 !run.isVictory() && run.getDeathCause().equals("고블린에게 사망"));
+        check("끝난 판 턴 수 저장", run.getTurns() == 37);
 
         RunResult clear = new RunResult();
-        clear.finish(p, true, "");
+        clear.finish(p, 0, true, "");
         check("클리어면 victory true", clear.isVictory());
     }
 
@@ -213,13 +214,13 @@ public final class PlayerSkeletonCheck {
         for (int i = 0; i < 14; i++) {
             run.addKill();
         }
-        run.finish(p, false, "오크에게 사망");
+        run.finish(p, 0, false, "오크에게 사망");
         check("예시: 3층·처치 14·레벨 4·골드 57 → 파편 61",
                 ShardCalculator.calculate(run, Profile.newProfile()) == 61);
 
         RunResult clear = new RunResult();
         clear.reachFloor(5);
-        clear.finish(p, true, "");
+        clear.finish(p, 0, true, "");
         check("클리어 보너스 100: 5층·레벨 4·골드 57 → 50 + 12 + 5 + 100 = 167",
                 ShardCalculator.calculate(clear, Profile.newProfile()) == 167);
 
@@ -228,7 +229,7 @@ public final class PlayerSkeletonCheck {
         profile.recordRun(clear, 167);
         RunResult shallow = new RunResult();
         shallow.reachFloor(2);
-        shallow.finish(p, false, "박쥐에게 사망");
+        shallow.finish(p, 0, false, "박쥐에게 사망");
         profile.recordRun(shallow, 0);
         check("파편 누적 61 + 167", profile.getShards() == 228);
         check("판 수 3, 처치 누적 14, 클리어 1",
@@ -245,7 +246,7 @@ public final class PlayerSkeletonCheck {
         for (int i = 0; i < 14; i++) {
             run.addKill();
         }
-        run.finish(p, false, "오크에게 사망");
+        run.finish(p, 0, false, "오크에게 사망");
         java.util.List<String> lines = ShardCalculator.breakdown(run, Profile.newProfile());
         check("내역 5줄 (층·처치·레벨·골드·합계)", lines.size() == 5);
         check("첫 줄: 도달 층 3 × 10 = 30", lines.get(0).equals("도달 층 3 × 10 = 30"));
@@ -256,11 +257,20 @@ public final class PlayerSkeletonCheck {
 
         RunResult clear = new RunResult();
         clear.reachFloor(5);
-        clear.finish(p, true, "");
+        clear.finish(p, 0, true, "");
         java.util.List<String> clearLines = ShardCalculator.breakdown(clear, Profile.newProfile());
         check("클리어하면 보너스 줄이 하나 더 (6줄)", clearLines.size() == 6);
         check("보너스 줄에 100", clearLines.get(4).contains("100"));
         check("클리어 합계 = 167", clearLines.get(5).equals("합계 = 167"));
+
+        // 파편 수집가 2단계(+20%): 61 의 20% = 12 (소수점 버림), 합계 73
+        Profile boosted = Profile.restore(0, 0, 0, 0, 0, java.util.Set.of(),
+                java.util.Map.of(UpgradeType.SHARD_BOOST, 2));
+        java.util.List<String> boostLines = ShardCalculator.breakdown(run, boosted);
+        check("파편 수집가가 있으면 한 줄 더 (6줄)", boostLines.size() == 6);
+        check("파편 수집가 줄: 61 × 20% = 12", boostLines.get(4).equals("파편 수집가 61 × 20% = 12"));
+        check("파편 수집가 합계 = 73", boostLines.get(5).equals("합계 = 73")
+                && ShardCalculator.calculate(run, boosted) == 73);
     }
 
     private static void checkBuy() {
@@ -385,7 +395,7 @@ public final class PlayerSkeletonCheck {
         p.getInventory().add(potion);
 
         String message = p.useItem(0);
-        check("맨손에서 검 장착 -> 장착 문장", message.contains("장착했다"));
+        check("맨손에서 검 장착 -> 장착 문장", message.contains("장착했습니다"));
         check("무기 칸에 검", p.getWeapon().isPresent() && p.getWeapon().get() == sword1);
         check("공격력 +3", p.getAttack() == bareAttack + 3);
         check("검은 가방에서 빠짐 (물약만 남음)", p.getInventory().size() == 1 && p.getInventory().get(0) == potion);
@@ -405,7 +415,7 @@ public final class PlayerSkeletonCheck {
         check("무기는 그대로", p.getWeapon().get() == sword2);
 
         String refuse = p.equip(potion);
-        check("물약은 장착할 수 없음", refuse.contains("장착할 수 없다"));
+        check("물약은 장착할 수 없음", refuse.contains("장착할 수 없습니다"));
     }
 
 

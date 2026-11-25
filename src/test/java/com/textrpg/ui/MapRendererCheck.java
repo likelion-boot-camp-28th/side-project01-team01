@@ -196,13 +196,14 @@ public final class MapRendererCheck {
         died.reachFloor(3);
         died.addKill();
         died.addKill();
-        died.finish(player, false, "늑대");
+        died.finish(player, 214, false, "늑대");
         expect("사망 제목", ConsoleView.formatResultTitle(died), "사망 - 늑대에게 쓰러졌습니다");
         expect("결과 요약", ConsoleView.formatResultSummary(died),
-                "도달 층 지하 3층  |  처치 2  |  레벨 " + player.getLevel() + "  |  골드 57");
+                "지하 3층  |  214턴  |  처치 2  |  레벨 " + player.getLevel() + "  |  골드 57");
+        expectWithinWidth("결과 요약", List.of(ConsoleView.formatResultSummary(died)));
 
         RunResult cleared = new RunResult();
-        cleared.finish(player, true, "");
+        cleared.finish(player, 0, true, "");
         expect("클리어 제목", ConsoleView.formatResultTitle(cleared), "클리어 - 어둠의 파수꾼을 쓰러뜨렸습니다!");
     }
 

@@ -469,7 +469,7 @@ public class GameManager {
      */
     private GameState endRun(boolean victory) {
         RunResult result = run.getRunResult();
-        result.finish(run.getPlayer(), victory, victory ? "" : turnSystem.getDeathCause());
+        result.finish(run.getPlayer(), run.getTurn(), victory, victory ? "" : turnSystem.getDeathCause());
         int shards = ShardCalculator.calculate(result, profile);
         profile.recordRun(result, shards);
         // 결과 화면보다 먼저 저장한다. 결과 화면에서 강제 종료해도 죽음을 되돌릴 수 없다.

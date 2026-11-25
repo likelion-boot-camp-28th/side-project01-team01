@@ -847,7 +847,7 @@ classDiagram
         -int turns
         +addKill()
         +reachFloor(int level)
-        +finish(Player p, boolean victory, String cause)
+        +finish(Player p, int turns, boolean victory, String cause)
     }
     class ShardCalculator {
         +calculate(RunResult r, Profile p)$ int
@@ -945,7 +945,7 @@ sequenceDiagram
     SM->>FS: slot1.sav.tmp 쓰기 후 교체
 
     Note over GM,FS: 사망 또는 클리어
-    GM->>GM: runResult.finish(player, victory, cause)
+    GM->>GM: runResult.finish(player, turn, victory, cause)
     GM->>SC: calculate(runResult, profile)
     SC-->>GM: 61 파편
     GM->>PR: recordRun(runResult, 61)
