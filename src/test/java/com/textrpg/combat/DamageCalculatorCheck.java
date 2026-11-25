@@ -58,7 +58,9 @@ public final class DamageCalculatorCheck {
     }
 
     private static void checkCalculate() {
-        Player warrior = new Player("전사", Job.WARRIOR);              // 공격 5, 방어 3
+        // 직업 수치(Job)가 밸런스 조정으로 바뀌어도 이 검사는 그대로 맞도록 공격 5·방어 3 을 직접 넣는다
+        Player warrior = Player.restore("전사", Job.WARRIOR, 1, 0, 0, 30, 30, 5, 5, 5, 3,
+                new Position(0, 0), null, null, List.of());
         Monster slime = monster(MonsterType.SLIME);                    // 공격 3, 방어 0
         Monster knight = monster(MonsterType.SHADOW_KNIGHT);           // 공격 11, 방어 6
 

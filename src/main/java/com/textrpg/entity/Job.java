@@ -6,9 +6,9 @@ package com.textrpg.entity;
  */
 public enum Job {
     //       이름      최대HP 최대MP 공격 방어 명중(%) 치명(%) 회피(%)
-    WARRIOR("전사", 30, 5, 5, 3, 90, 5, 5),
-    MAGE("마법사", 22, 20, 4, 1, 90, 5, 5),
-    ROGUE("도적", 25, 8, 5, 2, 95, 15, 15);
+    WARRIOR("전사", 40, 5, 7, 4, 90, 5, 5),
+    MAGE("마법사", 30, 15, 8, 2, 90, 10, 5),
+    ROGUE("도적", 34, 8, 6, 3, 95, 20, 15);
 
     private final String displayName;
     private final int maxHp;

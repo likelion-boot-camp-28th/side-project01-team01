@@ -300,7 +300,7 @@ public final class MapRendererCheck {
         String colored = ConsoleView.formatStatusBar(player, Painter.ANSI);
         expect("상태줄: 색 코드를 지우면 같음", Painter.strip(colored), plain);
         expect("상태줄: 너비 같음", ConsoleView.displayWidth(colored), ConsoleView.displayWidth(plain));
-        expect("상태줄: HP 가득이면 초록 막대", colored.startsWith(ansi(Style.HP_HIGH, ConsoleView.bar("HP", 30, 30, 10))), true);
+        expect("상태줄: HP 가득이면 초록 막대", colored.startsWith(ansi(Style.HP_HIGH, ConsoleView.bar("HP", player.getStats().getHp(), player.getStats().getMaxHp(), 10))), true);
 
         expect("HP 20/40 은 초록", ConsoleView.hpStyle(20, 40), Style.HP_HIGH);
         expect("HP 19/40 은 노랑", ConsoleView.hpStyle(19, 40), Style.HP_MID);
