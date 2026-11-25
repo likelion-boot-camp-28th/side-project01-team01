@@ -55,7 +55,7 @@ public final class PlayerSkeletonCheck {
 
     private static void checkNewPlayer() {
         Player p = new Player("용사", Job.WARRIOR);
-        check("전사 시작 HP 30", p.getStats().getHp() == 30);
+        check("전사 시작 HP 40", p.getStats().getHp() == 40);
         check("시작 레벨 1", p.getLevel() == 1);
         check("기호 @", p.getSymbol() == '@');
         check("맨손 공격 = 기본 공격", p.getAttack() == p.getStats().getAttack());
@@ -96,18 +96,18 @@ public final class PlayerSkeletonCheck {
         Player r = new Player("용사", Job.WARRIOR);
         r.gainExp(65);
         check("경험치 65 → 3레벨, 5 남음", r.getLevel() == 3 && r.getExp() == 5);
-        check("2번 레벨업 → 최대 HP 30+12", r.getStats().getMaxHp() == 42);
+        check("2번 레벨업 → 최대 HP 40+12", r.getStats().getMaxHp() == 52);
         check("2번 레벨업 → 최대 MP 5+4", r.getStats().getMaxMp() == 9);
-        check("2번 레벨업 → 공격 5+2, 방어 3+2", r.getBaseAttack() == 7 && r.getBaseDefense() == 5);
+        check("2번 레벨업 → 공격 7+2, 방어 4+2", r.getBaseAttack() == 9 && r.getBaseDefense() == 6);
     }
 
     private static void checkRegenerate() {
         Player p = new Player("용사", Job.WARRIOR);
         p.takeDamage(5);
         p.regenerate(9);
-        check("9턴째는 회복 안 함", p.getStats().getHp() == 25);
+        check("9턴째는 회복 안 함", p.getStats().getHp() == 35);
         p.regenerate(10);
-        check("10턴째 HP 1 회복", p.getStats().getHp() == 26);
+        check("10턴째 HP 1 회복", p.getStats().getHp() == 36);
     }
 
     private static void checkEquipUse() {
@@ -125,13 +125,13 @@ public final class PlayerSkeletonCheck {
         Player p = new Player("용사", Job.WARRIOR);
         p.takeDamage(15);
         String message = potion.use(p);
-        check("물약 최대 HP 30 의 25% = 8 회복 (15 -> 23)", p.getStats().getHp() == 23);
-        check("물약 문장에 실제 회복량 8", message.contains("HP 를 8"));
+        check("물약 최대 HP 40 의 25% = 10 회복 (25 -> 35)", p.getStats().getHp() == 35);
+        check("물약 문장에 실제 회복량 10", message.contains("HP 를 10"));
         check("치유 물약 문장에 MP 없음", !message.contains("MP"));
 
-        p.getStats().setHp(27);
+        p.getStats().setHp(37);
         message = potion.use(p);
-        check("최대 HP 를 넘지 않음 (27 -> 30)", p.getStats().getHp() == 30);
+        check("최대 HP 를 넘지 않음 (37 -> 40)", p.getStats().getHp() == 40);
         check("문장에는 실제로 오른 3 만", message.contains("HP 를 3"));
     }
 
@@ -307,8 +307,8 @@ public final class PlayerSkeletonCheck {
 
         Player p = new Player("용사", Job.WARRIOR);
         profile.applyTo(p);
-        check("최대 HP +10 (30 -> 40)", p.getStats().getMaxHp() == 40);
-        check("현재 HP 도 40 으로 꽉 참", p.getStats().getHp() == 40);
+        check("최대 HP +10 (40 -> 50)", p.getStats().getMaxHp() == 50);
+        check("현재 HP 도 50 으로 꽉 참", p.getStats().getHp() == 50);
         check("공격 +1", p.getStats().getAttack() == plain.getStats().getAttack() + 1);
         check("방어 +1", p.getStats().getDefense() == plain.getStats().getDefense() + 1);
     }
@@ -369,8 +369,8 @@ public final class PlayerSkeletonCheck {
         p.getInventory().add(ItemFactory.createById("HP_POTION_S"));
         p.takeDamage(15);
         String message = p.useItem(0);
-        check("가방 0번 물약 사용 -> HP 15 -> 23 (최대 30 의 25%)", p.getStats().getHp() == 23);
-        check("물약의 결과 문장을 그대로 돌려줌", message.contains("HP 를 8"));
+        check("가방 0번 물약 사용 -> HP 25 -> 35 (최대 40 의 25%)", p.getStats().getHp() == 35);
+        check("물약의 결과 문장을 그대로 돌려줌", message.contains("HP 를 10"));
         check("마신 물약은 가방에서 사라짐", p.getInventory().size() == 0);
 
         Item sword = ItemFactory.createById("IRON_SWORD");
@@ -439,8 +439,8 @@ public final class PlayerSkeletonCheck {
         mage.getStats().setMp(0);
         mage.getInventory().add(ItemFactory.createById("MP_POTION_S"));
         String message = mage.useItem(0);
-        check("마나 물약: 최대 MP 20 의 30% = 6 (0 -> 6)", mage.getStats().getMp() == 6);
-        check("마나 물약 문장에 MP 6", message.contains("MP 를 6"));
+        check("마나 물약: 최대 MP 15 의 30% = 4.5 → 반올림 5 (0 -> 5)", mage.getStats().getMp() == 5);
+        check("마나 물약 문장에 MP 5", message.contains("MP 를 5"));
         check("마신 마나 물약은 가방에서 사라짐", mage.getInventory().size() == 0);
     }
 
