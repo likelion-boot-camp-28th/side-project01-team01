@@ -10,8 +10,10 @@ classDiagram
     direction LR
     Main --> GameManager
     GameManager --> TurnSystem
+    GameManager --> ExplorationScreen
     GameManager --> ConsoleView
     GameManager --> SaveManager
+    ExplorationScreen --> TurnSystem
     TurnSystem --> Player
     TurnSystem --> Floor
     TurnSystem --> CombatSystem
@@ -21,7 +23,7 @@ classDiagram
     Floor --> Monster
     Floor --> FloorItem
     Floor --> Shop
-    GameManager ..> Shop : 상점 화면
+    ExplorationScreen ..> Shop : 상점 화면
     Player --> Inventory
     Inventory --> Item
     Entity <|-- Player
@@ -37,7 +39,7 @@ classDiagram
 
 | 파트 | 담당 | 클래스 |
 |---|---|---|
-| A | 게임 루프·UI·세이브 | Main, GameManager, GameState, TurnSystem, Command, CommandParser, ConsoleView, MapRenderer, InputHandler, RandomUtil, SaveManager, SlotData, SaveFileParser, SaveFileWriter, SaveLoadException, TurnOutcome, RankingManager(P1) |
+| A | 게임 루프·UI·세이브 | Main, GameManager, ExplorationScreen, InventoryScreen, ShopScreen, AltarScreen, NewRunScreen, GameState, TurnSystem, Command, CommandParser, ConsoleView, MapRenderer, InputHandler, RandomUtil, SaveManager, SlotData, SaveFileParser, SaveFileWriter, SaveLoadException, TurnOutcome, RankingManager(P1) |
 | B | 캐릭터·아이템·영구 성장 | Entity, Player, Job, Stats, Item, ItemKind, Weapon, Armor, Potion, Scroll(P1), Food(P1), ItemType, ItemUser, Inventory, FloorItem, ItemFactory, ItemIdentifier(P1), Profile, UpgradeType, RunResult, ShardCalculator |
 | C | 몬스터·전투 | Monster, Boss, PileOfBones, MonsterType, MonsterFactory, MonsterAI, CombatSystem, DamageCalculator, AttackResult |
 | D | 맵·생성 | Floor, Tile, Room, DungeonGenerator, FieldOfView(P1), DungeonGeneratorCheck(검증용, `src/test/java`) |
@@ -79,6 +81,7 @@ classDiagram
         +main(String[] args)$
     }
     class GameManager {
+        ~PRESS_ENTER$ String
         -GameState state
         -int slot
         -Profile profile
@@ -87,6 +90,9 @@ classDiagram
         -ConsoleView view
         -InputHandler input
         -SaveManager saveManager
+        -ExplorationScreen explorationScreen
+        -AltarScreen altarScreen
+        -NewRunScreen newRunScreen
         +start()
         -showMainMenu() GameState
         -showSlotMenu() GameState
@@ -95,9 +101,40 @@ classDiagram
         -newRun()
         -continueRun()
         -playRun() GameState
-        -descend()
         -saveAndQuit() GameState
         -endRun(boolean victory) GameState
+    }
+    class ExplorationScreen {
+        -TurnSystem turnSystem
+        -InventoryScreen inventoryScreen
+        -ShopScreen shopScreen
+        ~play(GameContext run) Exit
+        -runCommands(List~Command~ commands, GameContext run) Optional~Exit~
+        -openInventory(GameContext run) Optional~Exit~
+        -talk(GameContext run)
+        -isInterrupted(GameContext run, int hpBefore, Set~Monster~ seenBefore)$ boolean
+        -descend(GameContext run)$
+    }
+    class Exit {
+        <<enumeration>>
+        DIED
+        VICTORY
+        SAVE_QUIT
+    }
+    class InventoryScreen {
+        ~choose(Inventory inventory) Optional~Command~
+    }
+    class ShopScreen {
+        -COMMAND$ Pattern
+        ~open(Shop shop, Player player, MessageLog log)
+        ~run(Shop shop, Player player, String line)$ TradeResult
+    }
+    class AltarScreen {
+        ~open(Profile profile, Runnable onPurchase)
+    }
+    class NewRunScreen {
+        ~readName() String
+        ~chooseJob(Profile profile) Job
     }
     class GameState {
         <<enumeration>>
@@ -157,6 +194,9 @@ classDiagram
         LOG
         TALK
         WAIT
+        -Kind kind
+        +isItemCommand() boolean
+        +isScreenCommand() boolean
     }
     class CommandParser {
         +parse(String line)$ List~Command~
@@ -213,8 +253,11 @@ classDiagram
     }
     class InputHandler {
         -Scanner scanner
+        -PrintStream out
+        +InputHandler()
+        ~InputHandler(InputStream in, PrintStream out)
         +readLine(String prompt) String
-        +readInt(int min, int max) int
+        +readInt(String prompt, int min, int max) int
         +confirm(String prompt) boolean
     }
     class RandomUtil {
@@ -231,7 +274,15 @@ classDiagram
     TurnSystem ..> TurnOutcome
     GameManager --> ConsoleView
     GameManager --> InputHandler
-    GameManager ..> CommandParser
+    GameManager --> ExplorationScreen
+    GameManager --> AltarScreen
+    GameManager --> NewRunScreen
+    ExplorationScreen --> TurnSystem
+    ExplorationScreen --> InventoryScreen
+    ExplorationScreen --> ShopScreen
+    ExplorationScreen ..> Exit
+    ExplorationScreen ..> CommandParser
+    InventoryScreen ..> CommandParser
     CommandParser ..> Command : creates
     Command --> CommandType
     ConsoleView --> MapRenderer
@@ -240,13 +291,15 @@ classDiagram
     Painter ..> Style
 ```
 
-> 턴 순서(플레이어 행동 → 몬스터 행동 → 턴 마무리)는 `TurnSystem.playTurn()` 한곳에서 정한다. `INVENTORY`, `HELP`, `SAVE_QUIT`은 턴을 쓰지 않는 화면 명령이라 `GameManager`가 처리한다. 사망 원인은 `playTurn()`이 `DIED`를 돌려준 직후 `getDeathCause()`로 읽는다.
+> 화면 분리: `GameManager`는 `GameState` 전환과 저장 시점(새 탐험, 저장 후 종료, 사망·클리어, 제단 구매)만 정한다. 입력을 반복해서 받는 화면은 클래스를 따로 둔다: 탐험(`ExplorationScreen`, 그 안의 가방 `InventoryScreen`·상점 `ShopScreen`), 제단(`AltarScreen`), 이름·직업 선택(`NewRunScreen`). 화면 클래스는 저장하지 않는다. `ExplorationScreen.play()`는 화면을 나가는 이유(`Exit`: 사망 / 클리어 / 저장 후 종료)를 돌려주고 `GameManager`가 그에 따라 저장하거나 결과 화면으로 넘어간다. 제단은 강화를 살 때마다 `onPurchase`를 불러 `GameManager`가 바로 저장한다. 상점 명령 해석(`ShopScreen.run`)은 static 이라 콘솔 없이 `ShopScreenCheck`로 확인한다.
+>
+> 턴 순서(플레이어 행동 → 몬스터 행동 → 턴 마무리)는 `TurnSystem.playTurn()` 한곳에서 정한다. `INVENTORY`, `HELP`, `LOG`, `TALK`, `SAVE_QUIT`은 턴을 쓰지 않는 화면 명령이라 `ExplorationScreen`이 처리한다. 사망 원인은 `playTurn()`이 `DIED`를 돌려준 직후 `getDeathCause()`로 읽는다.
 >
 > `MapRenderer.glyphAt()` 우선순위: 플레이어 `@` → 몬스터 기호 → 바닥 아이템 기호 → 타일 기호. 시야에 따라 안 본 칸은 공백, 본 적 있지만 지금 안 보이는 칸은 타일만(몬스터·아이템 숨김). 기호 안내에도 지금 보이는 몬스터만 넣는다.
 >
 > 색(P2): 칸마다 `Style`을 정하고 `Painter.ANSI`가 ANSI 색 코드로 감싼다. 몬스터 빨강, 보스 굵은 자홍, 상인 굵은 노랑, 아이템은 종류별(골드 노랑, 물약 초록, 무기·방어구 청록), 본 적만 있는 칸 회색, 계단은 기억한 칸이어도 초록. `--no-color` 또는 환경 변수 `NO_COLOR`면 `Painter.PLAIN`(색 없음). 너비 계산(`ConsoleView.displayWidth`)은 색 코드를 빼고 센다. 인자 없는 `render(f, p)`는 색 없는 글자를 돌려준다 (확인용·다른 파트용).
 >
-> 연속 이동(`dddd`)은 이번 턴에 피해를 입었거나, 전에 안 보이던 몬스터가 보이게 됐거나, 몬스터가 바로 옆에 있으면 남은 이동을 버린다 (`GameManager.isInterrupted`).
+> 연속 이동(`dddd`)은 이번 턴에 피해를 입었거나, 전에 안 보이던 몬스터가 보이게 됐거나, 몬스터가 바로 옆에 있으면 남은 이동을 버린다 (`ExplorationScreen.isInterrupted`).
 
 ---
 
@@ -832,7 +885,8 @@ classDiagram
 
 호출 위치(A):
 - `TurnSystem.tryMove()`: 플레이어가 한 칸 움직일 때마다. 연속 이동 중에 지나친 칸도 `seen`에 남는다.
-- `GameManager`: 새 탐험 시작, 아래층으로 내려간 직후, 이어하기로 불러온 직후. `visible`은 세이브에 없으므로 불러온 뒤 다시 계산한다.
+- `GameManager`: 새 탐험 시작, 이어하기로 불러온 직후. `visible`은 세이브에 없으므로 불러온 뒤 다시 계산한다.
+- `ExplorationScreen.descend()`: 아래층으로 내려간 직후.
 
 ### 5.5 검증 (`src/test/java/com/textrpg/map/DungeonGeneratorCheck`)
 
@@ -938,6 +992,7 @@ classDiagram
         +save(int slot, SlotData data)
         +load(int slot) SlotData
         +exists(int slot) boolean
+        +hasRun(int slot) boolean
         +getSlotSummary(int slot) String
         +clearRun(int slot, Profile updated)
         -toLines(SlotData data) List~String~
@@ -1026,16 +1081,16 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant GM as GameManager
+    participant ES as ExplorationScreen
     participant V as ConsoleView
     participant TS as TurnSystem
     participant F as Floor
     participant CS as CombatSystem
     participant AI as MonsterAI
 
-    GM->>V: render(ctx)
-    GM->>GM: input.readLine() → CommandParser.parse()
-    GM->>TS: playTurn(cmd, ctx)
+    ES->>V: render(ctx)
+    ES->>ES: input.readLine() → CommandParser.parse()
+    ES->>TS: playTurn(cmd, ctx)
     alt 이동 방향에 몬스터 있음
         TS->>CS: attack(player, monster, log)
         CS-->>TS: AttackResult
@@ -1043,7 +1098,7 @@ sequenceDiagram
             TS->>CS: rewardKill(monster, ctx)
             CS->>F: removeMonster(monster)
             opt 보스 처치
-                TS-->>GM: VICTORY
+                TS-->>ES: VICTORY
             end
         end
     else 이동 가능
@@ -1059,7 +1114,7 @@ sequenceDiagram
             TS->>TS: poisonActivate(ctx) (독 피해 또는 해제, 쓰러지면 DIED)
         end
     end
-    TS-->>GM: TurnOutcome (NO_TURN / TURN_USED / DESCENDED / VICTORY / DIED)
+    TS-->>ES: TurnOutcome (NO_TURN / TURN_USED / DESCENDED / VICTORY / DIED)
 ```
 
 ---
@@ -1087,15 +1142,23 @@ classDiagram
         +sellPrice(Item item)$ int
         +getStock() List~Item~
         +getHealCost() int
-        +buy(Player p, int index) String
-        +sell(Player p, int index) String
-        +heal(Player p) String
+        +buy(Player p, int index) TradeResult
+        +sell(Player p, int index) TradeResult
+        +heal(Player p) TradeResult
+    }
+    class TradeResult {
+        <<record>>
+        boolean success
+        String message
+        +done(String message)$ TradeResult
+        +rejected(String message)$ TradeResult
     }
     Floor o-- Shop
     Shop --> Item
     Shop ..> Player : 골드·가방·HP
     Shop ..> ItemFactory : createById
-    GameManager ..> Shop : t → 상점 화면
+    Shop ..> TradeResult : creates
+    ShopScreen ..> Shop : t → 상점 화면
     ConsoleView ..> Shop : printShop
 ```
 
@@ -1103,7 +1166,7 @@ classDiagram
 |---|---|
 | 등장 | 지하 2~5층, 층마다 25%. 시작 방·마지막 방(계단·보스)이 아닌 방 하나가 상점방. 상점방에는 몬스터·아이템·골드를 생성하지 않는다 (다른 방 몬스터는 들어올 수 있음) |
 | 상인 | 상점방 중심, 기호 `M`. 지나갈 수 없다(`Floor.isWalkable`). 부딪히면 대화 방법을 안내하고 턴을 쓰지 않는다. 한 번 본 뒤에는 시야 밖에서도 보인다 |
-| 대화 | 상인 바로 옆(상하좌우)에서 `t`. 상점 화면은 `b 번호`(구매), `s 번호`(판매), `h`(치료), Enter(나가기). 상점 화면의 일은 턴을 쓰지 않고, 골드가 오간 거래는 탐험 로그에도 남긴다 |
+| 대화 | 상인 바로 옆(상하좌우)에서 `t`. 상점 화면은 `b 번호`(구매), `s 번호`(판매), `h`(치료), Enter(나가기). 상점 화면의 일은 턴을 쓰지 않고, 이루어진 거래(`TradeResult.success()`)는 탐험 로그에도 남긴다 |
 | 진열 | 5칸. 칸마다 그 층에서 나오는 아이템(`ItemKind.canDropOn`)을 같은 확률로 고른다. 이미 진열된 종류면 그 층 아이템 중에서 한 번만 다시 고르고, 또 겹치면 그대로 둔다. 칸마다 처음 고를 때만 2% 확률로 다음 층부터 처음 나오는 아이템을 고른다 (상점 하나에 약 10%, 5층은 다음 층이 없음). `ItemKind` 순서로 정렬 |
 | 구매 | `ItemKind` 상점가(고정). 가방이 가득 차거나 골드가 모자라면 아무것도 바뀌지 않는다. 산 상품은 진열에서 빠진다 |
 | 판매 | 상점가의 20% (소수점 버림). 판 아이템은 사라진다. 장착 중인 장비는 가방에 없으므로 팔 수 없다 |

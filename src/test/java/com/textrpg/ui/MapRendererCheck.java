@@ -2,8 +2,8 @@ package com.textrpg.ui;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
+import com.textrpg.CheckRunner;
 import com.textrpg.core.MessageLog;
 import com.textrpg.core.Position;
 import com.textrpg.entity.Job;
@@ -22,15 +22,15 @@ import com.textrpg.monster.MonsterFactory;
 import com.textrpg.monster.MonsterType;
 import com.textrpg.shop.Shop;
 
+import static com.textrpg.CheckRunner.expect;
+import static com.textrpg.CheckRunner.expectThrows;
+
 /**
  * MapRenderer(시야·상인·색 포함)와 ConsoleView 의 문자열 생성(formatHeader, formatStatusBar, 결과 화면, 기호 안내, 메시지 줄바꿈,
  * 색, 상점 화면) 확인용.
  * JUnit 대신 main 으로 실행한다 (Team_Rules 2.11). 실패가 하나라도 있으면 종료 코드 1.
  */
 public final class MapRendererCheck {
-
-    private static int passed;
-    private static int failed;
 
     private MapRendererCheck() {
     }
@@ -52,10 +52,7 @@ public final class MapRendererCheck {
         checkTextColors();
         checkShopLines();
 
-        System.out.println("통과 " + passed + " / 실패 " + failed);
-        if (failed > 0) {
-            System.exit(1);
-        }
+        CheckRunner.finish();
     }
 
     private static void checkSize() {
@@ -446,30 +443,5 @@ public final class MapRendererCheck {
             count += (int) line.chars().filter(ch -> ch == c).count();
         }
         return count;
-    }
-
-    private static void expect(String name, Object actual, Object expected) {
-        if (Objects.equals(actual, expected)) {
-            passed++;
-        } else {
-            failed++;
-            System.out.println("[실패] " + name + ": 기대 " + expected + " / 실제 " + actual);
-        }
-    }
-
-    private static void expectThrows(String name, Class<? extends RuntimeException> expected, Runnable action) {
-        try {
-            action.run();
-            failed++;
-            System.out.println("[실패] " + name + ": " + expected.getSimpleName() + " 이 나지 않음");
-        } catch (RuntimeException e) {
-            if (expected.isInstance(e)) {
-                passed++;
-            } else {
-                failed++;
-                System.out.println("[실패] " + name + ": 기대 " + expected.getSimpleName()
-                        + " / 실제 " + e.getClass().getSimpleName());
-            }
-        }
     }
 }

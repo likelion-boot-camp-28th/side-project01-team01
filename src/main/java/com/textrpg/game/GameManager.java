@@ -4,16 +4,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.EnumSet;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import com.textrpg.context.GameContext;
-import com.textrpg.core.Position;
 import com.textrpg.entity.Job;
 import com.textrpg.entity.Player;
 import com.textrpg.map.DungeonGenerator;
@@ -23,12 +18,10 @@ import com.textrpg.meta.Profile;
 import com.textrpg.meta.RunResult;
 import com.textrpg.meta.ShardCalculator;
 import com.textrpg.meta.UpgradeType;
-import com.textrpg.monster.Monster;
 import com.textrpg.save.CorruptedRunException;
 import com.textrpg.save.SaveLoadException;
 import com.textrpg.save.SaveManager;
 import com.textrpg.save.SlotData;
-import com.textrpg.shop.Shop;
 import com.textrpg.ui.ConsoleView;
 import com.textrpg.ui.InputClosedException;
 import com.textrpg.ui.InputHandler;
@@ -46,26 +39,26 @@ import com.textrpg.ui.InputHandler;
  * MAIN_MENU → QUIT
  * </pre>
  *
+ * <p>이 클래스는 상태 전환과 저장 시점(새 탐험, 저장 후 종료, 사망·클리어, 제단 구매)을 정한다.
+ * 입력을 반복해서 받는 화면은 따로 두었다: 탐험(ExplorationScreen, 가방·상점 화면 포함), 제단(AltarScreen),
+ * 이름·직업 선택(NewRunScreen).
+ *
  * <p>세이브 파일 오류(SaveLoadException)는 여기서 잡아 안내한 뒤 메인 메뉴로 돌아간다. 게임을 종료하지 않는다 (Team_Rules 2.9).
  * 입력 스트림이 끝나면(InputClosedException) 저장하지 않고 종료한다. 강제 종료와 같아서 마지막 저장 시점이 남는다.
  */
 public class GameManager {
 
-    private static final String COMMAND_PROMPT = "명령 (w/a/s/d 이동, i 가방, l 로그, > 내려가기, ? 도움말): ";
-    private static final String SHOP_PROMPT = "명령 (b 번호: 구매, s 번호: 판매, h: 치료, Enter: 나가기): ";
-    /** 상점 명령: "b 2", "s3", "h". 대소문자를 구분하지 않는다. */
-    private static final Pattern SHOP_COMMAND = Pattern.compile("([bsh])\\s*(\\d*)", Pattern.CASE_INSENSITIVE);
-    private static final String PRESS_ENTER = "Enter 를 누르면 돌아갑니다.";
-    private static final String INVENTORY_PROMPT = "명령 (u/e/x 번호, Enter: 돌아가기): ";
-    private static final int MAX_NAME_LENGTH = 12;
-    /** 이름을 비워 두면 쓰는 기본 이름. */
-    private static final String DEFAULT_NAME = "모험가";
+    /** Enter 를 기다릴 때의 안내. 탐험 화면(도움말·로그)도 같이 쓴다. */
+    static final String PRESS_ENTER = "Enter 를 누르면 돌아갑니다.";
 
     private final ConsoleView view;
     private final InputHandler input;
     private final SaveManager saveManager;
     private final TurnSystem turnSystem;
     private final DebugOptions debug;
+    private final ExplorationScreen explorationScreen;
+    private final AltarScreen altarScreen;
+    private final NewRunScreen newRunScreen;
 
     private GameState state = GameState.MAIN_MENU;
     /** 선택한 슬롯 번호 (1 ~ SaveManager.SLOT_COUNT). 슬롯을 고르기 전에는 0. */
@@ -87,6 +80,9 @@ public class GameManager {
         this.saveManager = saveManager;
         this.turnSystem = turnSystem;
         this.debug = debug;
+        this.explorationScreen = new ExplorationScreen(view, input, turnSystem);
+        this.altarScreen = new AltarScreen(view, input);
+        this.newRunScreen = new NewRunScreen(view, input);
     }
 
     /** QUIT 이 될 때까지 화면을 차례로 보여 준다. Main 이 호출한다. */
@@ -231,33 +227,17 @@ public class GameManager {
 
     /** 이 슬롯에 저장된 진행 중 탐험이 있는지. 슬롯 메뉴의 "이어하기" 표시와 새 탐험 확인에 쓴다. */
     private boolean hasSavedRun() {
-        return saveManager.exists(slot) && saveManager.load(slot).hasRun();
+        return saveManager.hasRun(slot);
     }
 
     /**
-     * 어둠의 제단: 강화를 사면 profile.buy() 후 즉시 저장한다 (기획서 2.7 제단 구매 저장).
+     * 어둠의 제단: 강화를 살 때마다 즉시 저장한다 (기획서 2.7 제단 구매 저장).
      *
      * @return SLOT_MENU
      */
     private GameState showAltar() {
-        view.clearScreen();
-        UpgradeType[] types = UpgradeType.values();
-        while (true) {
-            view.printAltar(profile);
-            int choice = input.readInt("강화 번호 (0: 돌아가기): ", 0, types.length);
-            if (choice == 0) {
-                return GameState.SLOT_MENU;
-            }
-            UpgradeType type = types[choice - 1];
-            if (profile.buy(type)) {
-                saveManager.save(slot, SlotData.profileOnly(profile));
-                view.printLine(type.getDisplayName() + " " + profile.getLevel(type) + "단계를 얻었습니다.");
-            } else if (profile.getLevel(type) >= type.getMaxLevel()) {
-                view.printLine(type.getDisplayName() + " 은(는) 이미 최대 단계입니다.");
-            } else {
-                view.printLine("파편이 부족합니다.");
-            }
-        }
+        altarScreen.open(profile, () -> saveManager.save(slot, SlotData.profileOnly(profile)));
+        return GameState.SLOT_MENU;
     }
 
     /**
@@ -277,8 +257,8 @@ public class GameManager {
      * 직업은 profile.isUnlocked() 인 것만 고를 수 있다.
      */
     private void newRun() {
-        String name = readPlayerName();
-        Job job = chooseJob();
+        String name = newRunScreen.readName();
+        Job job = newRunScreen.chooseJob(profile);
         Player player = new Player(name, job);
         profile.applyTo(player);
 
@@ -293,28 +273,6 @@ public class GameManager {
         saveManager.save(slot, SlotData.withRun(profile, run));
     }
 
-    /** 캐릭터 이름을 입력받는다. 비워 두면 기본 이름, 너무 길면 다시 묻는다. */
-    private String readPlayerName() {
-        while (true) {
-            String name = input.readLine("캐릭터 이름 (1~" + MAX_NAME_LENGTH + "자, 비우면 " + DEFAULT_NAME + "): ");
-            if (name.isEmpty()) {
-                return DEFAULT_NAME;
-            }
-            if (name.length() <= MAX_NAME_LENGTH) {
-                return name;
-            }
-            view.printLine("이름은 " + MAX_NAME_LENGTH + "자까지 입력할 수 있습니다.");
-        }
-    }
-
-    /** 해금된 직업 중 하나를 고른다. */
-    private Job chooseJob() {
-        List<Job> jobs = Arrays.stream(Job.values()).filter(profile::isUnlocked).toList();
-        view.printMenu("직업 선택", jobs.stream().map(Job::getDisplayName).toList());
-        int choice = input.readInt("번호: ", 1, jobs.size());
-        return jobs.get(choice - 1);
-    }
-
     /** 세이브의 진행 중 탐험을 불러온다. 슬롯 메뉴는 탐험이 있을 때만 이어하기를 보여 준다. */
     private void continueRun() {
         run = saveManager.load(slot).run()
@@ -325,235 +283,20 @@ public class GameManager {
     }
 
     /**
-     * 탐험 턴 루프: 화면 그리기 → 입력 → CommandParser.parse → 명령마다 처리.
-     * 화면 명령(INVENTORY, HELP, LOG, TALK, SAVE_QUIT)은 여기서 처리하고, 나머지는 turnSystem.playTurn() 에 넘긴다.
-     * 탐험 화면에는 이번 행동으로 생긴 메시지만 보이도록, 턴을 쓰는 명령을 실행하기 전에 지난 메시지를 읽음 처리한다.
-     * 연속 이동(dddd)은 명령마다 한 턴씩 진행하고, 중간에 몬스터가 나타나거나 턴을 못 쓰면 남은 명령을 버린다.
+     * 탐험 화면을 열고, 화면을 나가는 이유에 따라 다음 상태를 정한다.
      *
-     * @return DIED → DEAD, VICTORY → VICTORY, 저장 후 종료 → SLOT_MENU
+     * @return 사망 → DEAD, 클리어 → VICTORY, 저장 후 종료 → SLOT_MENU
      */
     private GameState playRun() {
-        GameState next = GameState.PLAYING;
-        while (next == GameState.PLAYING) {
-            view.render(run);
-            String line = input.readLine(COMMAND_PROMPT);
-            List<Command> commands = CommandParser.parse(line);
-            if (commands.isEmpty()) {
-                if (!line.isEmpty()) {
-                    run.getLog().add("알 수 없는 명령입니다: " + line + " (? 를 누르면 도움말)");
-                }
-                continue;
-            }
-            if (!isScreenCommand(commands.get(0).type())) {
-                run.getLog().markRead();
-            }
-            next = runCommands(commands);
-        }
-        return next;
-    }
-
-    /**
-     * 가방 화면 (i). 여기서 u/e/x 번호를 입력하면 그 명령을 한 턴으로 실행하고 탐험 화면으로 돌아간다.
-     * 몬스터도 그 턴에 움직이므로 결과는 탐험 화면에서 본다. 빈 입력이면 턴을 쓰지 않고 돌아간다.
-     *
-     * @return 아이템 명령을 실행했으면 그 결과(PLAYING, DEAD 등), 그냥 닫았으면 PLAYING
-     */
-    private GameState openInventory() {
-        String error = "";
-        while (true) {
-            view.clearScreen();
-            view.printInventory(run.getPlayer().getInventory());
-            if (!error.isEmpty()) {
-                view.printLine(error);
-            }
-            String line = input.readLine(INVENTORY_PROMPT);
-            if (line.isEmpty()) {
-                return GameState.PLAYING;
-            }
-            List<Command> commands = CommandParser.parse(line);
-            if (commands.size() == 1 && isItemCommand(commands.get(0).type())) {
-                run.getLog().markRead();
-                return runCommands(commands);
-            }
-            error = "가방에서는 u 번호, e 번호, x 번호만 입력할 수 있습니다: " + line;
-        }
-    }
-
-    /**
-     * 상인과 대화 (t). 상인이 바로 옆(상하좌우)에 있으면 상점 화면을 연다. 상점에서 하는 일은 턴을 쓰지 않는다.
-     *
-     * @return 항상 PLAYING
-     */
-    private GameState talk() {
-        Floor floor = run.getFloor();
-        Position pos = run.getPlayer().getPos();
-        Optional<Shop> shop = floor.getShop().filter(s -> s.getMerchantPos().isAdjacent(pos));
-        if (shop.isEmpty()) {
-            run.getLog().add("말을 걸 상대가 없습니다. 상인 바로 옆에서 t 를 누르세요.");
-            return GameState.PLAYING;
-        }
-        run.getLog().markRead();
-        openShop(shop.get());
-        return GameState.PLAYING;
-    }
-
-    /**
-     * 상점 화면. b 번호(구매), s 번호(판매), h(치료)를 Enter 를 누를 때까지 반복한다.
-     * 결과 문장은 화면 아래에 보여 주고, 골드가 오간 거래는 탐험 로그에도 남긴다.
-     */
-    private void openShop(Shop shop) {
-        Player player = run.getPlayer();
-        String result = "";
-        while (true) {
-            view.clearScreen();
-            view.printShop(shop, player);
-            if (!result.isEmpty()) {
-                view.printLine(result);
-            }
-            String line = input.readLine(SHOP_PROMPT);
-            if (line.isEmpty()) {
-                return;
-            }
-            int goldBefore = player.getGold();
-            result = runShopCommand(shop, line);
-            if (player.getGold() != goldBefore) {
-                run.getLog().add(result);
-            }
-        }
-    }
-
-    /** 상점 명령 한 줄을 실행하고 결과 문장을 돌려준다. 번호는 화면 기준 1부터 받는다. */
-    private String runShopCommand(Shop shop, String line) {
-        Matcher m = SHOP_COMMAND.matcher(line.strip());
-        String error = "상점에서는 b 번호, s 번호, h 만 입력할 수 있습니다: " + line;
-        if (!m.matches()) {
-            return error;
-        }
-        char key = Character.toLowerCase(m.group(1).charAt(0));
-        String number = m.group(2);
-        if (key == 'h') {
-            return number.isEmpty() ? shop.heal(run.getPlayer()) : error;
-        }
-        int index;
-        try {
-            index = Integer.parseInt(number) - 1;
-        } catch (NumberFormatException e) {
-            // 번호가 없거나 int 범위를 넘을 때
-            return error;
-        }
-        return key == 'b' ? shop.buy(run.getPlayer(), index) : shop.sell(run.getPlayer(), index);
-    }
-
-    private static boolean isItemCommand(CommandType type) {
-        return type == CommandType.USE || type == CommandType.EQUIP || type == CommandType.DROP;
-    }
-
-    /** 턴을 쓰지 않고 다른 화면을 여는 명령인지. 이 명령들은 CommandParser 가 한 줄에 하나만 만든다. */
-    private static boolean isScreenCommand(CommandType type) {
-        return type == CommandType.INVENTORY || type == CommandType.HELP
-                || type == CommandType.LOG || type == CommandType.TALK || type == CommandType.SAVE_QUIT;
-    }
-
-    /**
-     * 한 줄에서 나온 명령들을 차례로 실행한다. 화면 명령(INVENTORY, HELP, LOG, TALK, SAVE_QUIT)은 CommandParser 가
-     * 한 줄에 하나만 만들므로 여기서 바로 처리한다. 연속 이동은 턴을 못 썼거나 중단 조건에 걸리면 남은 명령을 버린다.
-     *
-     * @return 탐험이 이어지면 PLAYING, 아니면 다음 상태 (DEAD, VICTORY, SLOT_MENU)
-     */
-    private GameState runCommands(List<Command> commands) {
-        for (Command cmd : commands) {
-            switch (cmd.type()) {
-                case INVENTORY -> {
-                    return openInventory();
-                }
-                case HELP -> {
-                    view.clearScreen();
-                    view.printHelp();
-                    waitForEnter();
-                    return GameState.PLAYING;
-                }
-                case LOG -> {
-                    view.clearScreen();
-                    view.printLogHistory(run.getLog());
-                    waitForEnter();
-                    return GameState.PLAYING;
-                }
-                case TALK -> {
-                    return talk();
-                }
-                case SAVE_QUIT -> {
-                    return saveAndQuit();
-                }
-                default -> {
-                    int hpBefore = run.getPlayer().getStats().getHp();
-                    Set<Monster> seenBefore = visibleMonsters();
-                    TurnOutcome outcome = turnSystem.playTurn(cmd, run);
-                    if (outcome == TurnOutcome.DIED) {
-                        return GameState.DEAD;
-                    }
-                    if (outcome == TurnOutcome.VICTORY) {
-                        return GameState.VICTORY;
-                    }
-                    if (outcome == TurnOutcome.DESCENDED) {
-                        descend();
-                        return GameState.PLAYING;
-                    }
-                    if (outcome == TurnOutcome.NO_TURN || isInterrupted(hpBefore, seenBefore)) {
-                        return GameState.PLAYING;
-                    }
-                }
-            }
-        }
-        return GameState.PLAYING;
-    }
-
-    /**
-     * 연속 이동을 멈춰야 하는지 (기획서: 몬스터 발견 시 중단).
-     * 이번 턴에 피해를 입었거나, 전에 안 보이던 몬스터가 보이게 됐거나, 몬스터가 바로 옆에 있으면 멈춘다.
-     *
-     * @param hpBefore   이번 턴 전 HP
-     * @param seenBefore 이번 턴 전에 보이던 몬스터
-     */
-    private boolean isInterrupted(int hpBefore, Set<Monster> seenBefore) {
-        Player player = run.getPlayer();
-        if (player.getStats().getHp() < hpBefore) {
-            return true;
-        }
-        if (!seenBefore.containsAll(visibleMonsters())) {
-            return true;
-        }
-        Position pos = player.getPos();
-        return run.getFloor().getMonsters().stream().anyMatch(m -> m.getPos().isAdjacent(pos));
-    }
-
-    /** 지금 시야 안에 있는 몬스터. 같은 몬스터인지는 객체로 비교한다. */
-    private Set<Monster> visibleMonsters() {
-        Floor floor = run.getFloor();
-        Set<Monster> visible = new HashSet<>();
-        for (Monster m : floor.getMonsters()) {
-            if (floor.isVisible(m.getPos().x(), m.getPos().y())) {
-                visible.add(m);
-            }
-        }
-        return visible;
+        return switch (explorationScreen.play(run)) {
+            case DIED -> GameState.DEAD;
+            case VICTORY -> GameState.VICTORY;
+            case SAVE_QUIT -> saveAndQuit();
+        };
     }
 
     private void waitForEnter() {
         input.readLine(PRESS_ENTER);
-    }
-
-    /**
-     * 다음 층을 만들어 들어간다. 지나온 층은 버린다 (돌아갈 수 없음).
-     * 계단은 보스층(5층) 전까지만 있으므로 TurnSystem 이 DESCENDED 를 돌려준 경우에만 부른다.
-     */
-    private void descend() {
-        int nextLevel = run.getFloor().getLevel() + 1;
-        Floor next = DungeonGenerator.generate(nextLevel);
-        run.setFloor(next);
-        run.getPlayer().setPos(next.getStartPos());
-        FieldOfView.update(next, next.getStartPos());
-        run.getRunResult().reachFloor(nextLevel);
-        run.getLog().add("지하 " + nextLevel + "층으로 내려왔습니다.");
     }
 
     /**

@@ -1,17 +1,20 @@
 package com.textrpg.game;
 
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 
+import com.textrpg.CheckRunner;
 import com.textrpg.core.Direction;
+
+import static com.textrpg.CheckRunner.check;
+import static com.textrpg.CheckRunner.expectThrows;
 
 /**
  * CommandParser / Command 확인용. JUnit 대신 main 으로 실행한다 (Team_Rules 2.11).
  * 실패가 하나라도 있으면 종료 코드 1.
  */
 public final class CommandParserCheck {
-
-    private static int passed;
-    private static int failed;
 
     private CommandParserCheck() {
     }
@@ -23,11 +26,9 @@ public final class CommandParserCheck {
         checkItemCommands();
         checkUnknownInput();
         checkCommandValidation();
+        checkCommandKinds();
 
-        System.out.println("통과 " + passed + " / 실패 " + failed);
-        if (failed > 0) {
-            System.exit(1);
-        }
+        CheckRunner.finish();
     }
 
     private static void checkEmptyInput() {
@@ -97,31 +98,28 @@ public final class CommandParserCheck {
     }
 
     private static void checkCommandValidation() {
-        expectThrows("방향 없는 MOVE", () -> Command.of(CommandType.MOVE));
-        expectThrows("번호 없는 USE", () -> Command.of(CommandType.USE));
-        expectThrows("MOVE 에 번호", () -> Command.item(CommandType.MOVE, 1));
-        expectThrows("음수 번호", () -> Command.item(CommandType.USE, -1));
-        expectThrows("PICK_UP 에 방향", () -> new Command(CommandType.PICK_UP, Direction.UP, Command.NO_ITEM));
-        expectThrows("type 이 null", () -> new Command(null, null, Command.NO_ITEM));
+        expectThrows("방향 없는 MOVE", IllegalArgumentException.class, () -> Command.of(CommandType.MOVE));
+        expectThrows("번호 없는 USE", IllegalArgumentException.class, () -> Command.of(CommandType.USE));
+        expectThrows("MOVE 에 번호", IllegalArgumentException.class, () -> Command.item(CommandType.MOVE, 1));
+        expectThrows("음수 번호", IllegalArgumentException.class, () -> Command.item(CommandType.USE, -1));
+        expectThrows("PICK_UP 에 방향", IllegalArgumentException.class,
+                () -> new Command(CommandType.PICK_UP, Direction.UP, Command.NO_ITEM));
+        expectThrows("type 이 null", NullPointerException.class, () -> new Command(null, null, Command.NO_ITEM));
     }
 
+    /** 명령 분류. ExplorationScreen·InventoryScreen 이 이 분류로 화면 명령과 아이템 명령을 가른다. */
+    private static void checkCommandKinds() {
+        Set<CommandType> items = EnumSet.of(CommandType.USE, CommandType.EQUIP, CommandType.DROP);
+        Set<CommandType> screens = EnumSet.of(CommandType.INVENTORY, CommandType.HELP, CommandType.LOG,
+                CommandType.TALK, CommandType.SAVE_QUIT);
+        for (CommandType type : CommandType.values()) {
+            check(type + " 아이템 명령 여부", type.isItemCommand() == items.contains(type));
+            check(type + " 화면 명령 여부", type.isScreenCommand() == screens.contains(type));
+        }
+    }
+
+    /** parse(input) 결과가 expected 인지. */
     private static void expect(String input, List<Command> expected) {
-        List<Command> actual = CommandParser.parse(input);
-        if (actual.equals(expected)) {
-            passed++;
-        } else {
-            failed++;
-            System.out.println("[실패] parse(\"" + input + "\") 기대 " + expected + " / 실제 " + actual);
-        }
-    }
-
-    private static void expectThrows(String name, Runnable action) {
-        try {
-            action.run();
-            failed++;
-            System.out.println("[실패] " + name + ": 예외가 나지 않음");
-        } catch (IllegalArgumentException | NullPointerException e) {
-            passed++;
-        }
+        CheckRunner.expect("parse(\"" + input + "\")", CommandParser.parse(input), expected);
     }
 }

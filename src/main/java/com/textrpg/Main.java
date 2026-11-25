@@ -30,15 +30,16 @@ public final class Main {
     }
 
     public static void main(String[] args) {
+        // 옵션 오류도 ConsoleView 로 출력하도록 화면을 먼저 만든다 (Team_Rules 1.2)
+        boolean color = !hasArg(args, "--no-color") && System.getenv("NO_COLOR") == null;
+        ConsoleView view = new ConsoleView(!hasArg(args, "--no-clear"), color);
         DebugOptions debug;
         try {
             debug = DebugOptions.parse(args);
         } catch (IllegalArgumentException e) {
-            System.out.println("실행 옵션 오류: " + e.getMessage());
+            view.printLine("실행 옵션 오류: " + e.getMessage());
             return;
         }
-        boolean color = !hasArg(args, "--no-color") && System.getenv("NO_COLOR") == null;
-        ConsoleView view = new ConsoleView(!hasArg(args, "--no-clear"), color);
         TurnSystem turnSystem = new TurnSystem(new CombatSystem(), new MonsterAI());
         new GameManager(view, new InputHandler(), new SaveManager(SAVE_DIR), turnSystem, debug).start();
     }

@@ -15,7 +15,7 @@ Git 사용 규칙은 [Git_Convention.md](Git_Convention.md)를 따른다.
 
 ### 1.2 프로젝트 고유 규칙
 - 외부 라이브러리를 추가하지 않는다. `../build.gradle`의 `dependencies`는 비워 둔다.
-- `System.out`, `System.in`을 직접 쓰지 않는다. 출력은 `ConsoleView`, 입력은 `InputHandler`만 사용한다.
+- `System.out`, `System.in`을 직접 쓰지 않는다. 출력은 `ConsoleView`, 입력은 `InputHandler`만 사용한다. 단, 입력 프롬프트와 입력 오류 안내("1 ~ 3 사이의 숫자를 입력하세요.")는 입력과 붙어 있으므로 `InputHandler`가 출력한다.
 - 게임 중 발생하는 문장(전투, 획득, 이벤트)은 `MessageLog.add()`로 남긴다.
 - `new Random()`을 직접 만들지 않는다. 모든 난수는 `RandomUtil`을 사용한다.
 - 몬스터·아이템은 각 Factory의 id/type 기반 메서드로만 생성한다 (세이브 복원과 같은 경로를 쓰기 위해).
