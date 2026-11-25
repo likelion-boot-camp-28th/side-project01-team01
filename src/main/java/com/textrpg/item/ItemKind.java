@@ -8,14 +8,26 @@ import java.util.function.Function;
  *
  * <p>상수 이름이 세이브 파일에 쓰는 아이템 id 다. 이름을 바꾸면 예전 세이브를 읽지 못하므로 바꾸지 않는다.
  * 설명에는 수치를 쓰지 않는다. 수치는 Item.getDescription() 이 실제 값으로 붙인다.
- * 드랍 층수는 MonsterType 처럼 1~5층 기준 (5층은 보스층).
+ * 드랍 층수는 MonsterType 처럼 1~5층 기준 (5층은 보스층). 장비는 2층부터 나오고,
+ * 맨몸으로 2층에 들어가지 않도록 가죽 갑옷만 1층부터 나온다.
+ * 장비는 깊은 층일수록 수치가 높고, 물약 수치는 최대 HP·MP 의 회복 비율(%)이다.
  */
 public enum ItemKind {
-    //            이름              설명                          드랍 층   종류와 수치
-    IRON_SWORD("철 검", "평범한 철로 만든 검.", 1, 3, kind -> new Weapon(kind, 3)),
+    //               이름              설명                                드랍 층   종류와 수치
+    // 무기: 공격력 보너스
+    IRON_SWORD("철 검", "평범한 철로 만든 검.", 2, 3, kind -> new Weapon(kind, 3)),
+    STEEL_SWORD("강철 검", "잘 벼린 강철 검.", 3, 4, kind -> new Weapon(kind, 5)),
+    RUNE_BLADE("룬 대검", "푸른 룬이 새겨진 묵직한 대검.", 4, 5, kind -> new Weapon(kind, 7)),
+    // 방어구: 방어력 보너스
     LEATHER_ARMOR("가죽 갑옷", "질긴 가죽으로 만든 갑옷.", 1, 3, kind -> new Armor(kind, 2)),
-    HP_POTION_S("작은 치유 물약", "마시면 상처가 아문다.", 1, 5, kind -> new Potion(kind, 10, 0)),
-    MP_POTION_S("작은 마나 물약", "마시면 정신이 맑아진다.", 1, 5, kind -> new Potion(kind, 0, 5));
+    CHAIN_MAIL("사슬 갑옷", "쇠고리를 엮어 만든 갑옷.", 3, 4, kind -> new Armor(kind, 3)),
+    STEEL_PLATE("강철 판금", "온몸을 덮는 강철 판금 갑옷.", 4, 5, kind -> new Armor(kind, 4)),
+    GUARDIAN_PLATE("수호자의 판금", "어둠의 파수꾼에 맞선 기사들이 입던 갑옷.", 5, 5, kind -> new Armor(kind, 5)),
+    // 물약: 최대 HP·MP 의 회복 비율(%). 마나 물약은 같은 크기의 치유 물약보다 조금 더 회복한다
+    HP_POTION_S("작은 치유 물약", "마시면 상처가 아문다.", 1, 5, kind -> new Potion(kind, 25, 0)),
+    HP_POTION_L("큰 치유 물약", "마시면 깊은 상처까지 아문다.", 3, 5, kind -> new Potion(kind, 50, 0)),
+    MP_POTION_S("작은 마나 물약", "마시면 정신이 맑아진다.", 1, 5, kind -> new Potion(kind, 0, 30)),
+    MP_POTION_L("큰 마나 물약", "마시면 정신이 또렷하게 깨어난다.", 3, 5, kind -> new Potion(kind, 0, 60));
 
     private final String displayName;
     private final String description;

@@ -238,6 +238,16 @@ public class Player extends Entity implements ItemUser {
         getStats().setDefense(getStats().getDefense() + LEVEL_UP_DEFENSE);
     }
 
+    @Override
+    public int getMaxHp() {
+        return getStats().getMaxHp();
+    }
+
+    @Override
+    public int getMaxMp() {
+        return getStats().getMaxMp();
+    }
+
     /**
      * MP 를 회복하고, 실제로 회복된 MP 양을 돌려준다.
      */
