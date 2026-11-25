@@ -5,7 +5,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Objects;
+
+import com.textrpg.CheckRunner;
+
+import static com.textrpg.CheckRunner.expect;
+import static com.textrpg.CheckRunner.expectThrows;
 
 /**
  * SaveFileWriter 확인용. JUnit 대신 main 으로 실행한다 (Team_Rules 2.11).
@@ -14,9 +18,6 @@ import java.util.Objects;
  * <p>가장 중요한 확인은 왕복이다: Writer 가 만든 줄을 파일에 쓰고 다시 읽어 SaveFileParser 로 해석했을 때 같은 값이어야 한다.
  */
 public final class SaveFileWriterCheck {
-
-    private static int passed;
-    private static int failed;
 
     private SaveFileWriterCheck() {
     }
@@ -31,10 +32,7 @@ public final class SaveFileWriterCheck {
         checkRejectedCallsWriteNothing();
         checkToLinesCopy();
 
-        System.out.println("통과 " + passed + " / 실패 " + failed);
-        if (failed > 0) {
-            System.exit(1);
-        }
+        CheckRunner.finish();
     }
 
     private static void checkFormat() {
@@ -186,13 +184,7 @@ public final class SaveFileWriterCheck {
         SaveFileWriter w = new SaveFileWriter();
         w.section("A");
         List<String> before = w.toLines();
-        try {
-            before.add("x=1");
-            failed++;
-            System.out.println("[실패] toLines 결과를 수정할 수 있음");
-        } catch (UnsupportedOperationException e) {
-            passed++;
-        }
+        expectThrows("toLines 결과는 수정할 수 없음", UnsupportedOperationException.class, () -> before.add("x=1"));
         w.put("k", "v");
         expect("이미 받은 목록은 그대로", before, List.of("[A]"));
         expect("새로 받은 목록에는 반영", w.toLines(), List.of("[A]", "k=v"));
@@ -204,32 +196,6 @@ public final class SaveFileWriterCheck {
             w.section("A");
             w.put(key, value);
         });
-    }
-
-    private static void expect(String name, Object actual, Object expected) {
-        if (Objects.equals(actual, expected)) {
-            passed++;
-        } else {
-            failed++;
-            System.out.println("[실패] " + name + ": 기대 " + expected + " / 실제 " + actual);
-        }
-    }
-
-    /** expected 종류의 예외가 나야 통과. 다른 예외가 나거나 예외가 없으면 실패. */
-    private static void expectThrows(String name, Class<? extends RuntimeException> expected, Runnable action) {
-        try {
-            action.run();
-            failed++;
-            System.out.println("[실패] " + name + ": " + expected.getSimpleName() + " 이 나지 않음");
-        } catch (RuntimeException e) {
-            if (expected.isInstance(e)) {
-                passed++;
-            } else {
-                failed++;
-                System.out.println("[실패] " + name + ": 기대 " + expected.getSimpleName()
-                        + " / 실제 " + e.getClass().getSimpleName());
-            }
-        }
     }
 
     /** 예외가 나는 호출을 실행만 한다. 예외 확인은 다른 메서드에서 한다. */

@@ -50,7 +50,8 @@ final class SlotCodec {
     private static final String META = "META";
     private static final String PROFILE = "PROFILE";
     private static final String UPGRADES = "UPGRADES";
-    private static final String RUN = "RUN";
+    /** 진행 중인 탐험 섹션. SaveManager.hasRun 도 이 이름으로 탐험이 있는지 본다. */
+    static final String RUN = "RUN";
     private static final String PLAYER = "PLAYER";
     private static final String INVENTORY = "INVENTORY";
     private static final String FLOOR = "FLOOR";

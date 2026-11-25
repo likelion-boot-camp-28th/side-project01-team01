@@ -63,7 +63,7 @@ public final class SaveFileWriter {
             throw new IllegalStateException("section() 을 한 번도 부르지 않았습니다: " + key);
         }
         if (key == null || !NAME_PATTERN.matcher(key).matches()) {
-            throw new IllegalArgumentException("key 가 null 이거나 영문, 숫쟈, _가 아닌 값이 들어 있습니다: " + key + "=" + value);
+            throw new IllegalArgumentException("key 가 null 이거나 영문, 숫자, _가 아닌 값이 들어 있습니다: " + key + "=" + value);
         }
         if (value == null || hasLineBreak(value) || !value.equals(value.strip())) {
             throw new IllegalArgumentException("[" + key + "] value 가 null 이거나 줄바꿈·앞뒤 공백이 있습니다: " + value);

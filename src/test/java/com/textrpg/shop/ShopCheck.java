@@ -2,8 +2,8 @@ package com.textrpg.shop;
 
 import java.util.HashSet;
 import java.util.List;
-import java.util.Objects;
 
+import com.textrpg.CheckRunner;
 import com.textrpg.core.Position;
 import com.textrpg.entity.Job;
 import com.textrpg.entity.Player;
@@ -14,6 +14,11 @@ import com.textrpg.item.ItemKind;
 import com.textrpg.map.DungeonGenerator;
 import com.textrpg.util.RandomUtil;
 
+import static com.textrpg.CheckRunner.expect;
+import static com.textrpg.CheckRunner.expectThrows;
+import static com.textrpg.CheckRunner.fail;
+import static com.textrpg.CheckRunner.pass;
+
 /**
  * Shop 확인용: 진열 상품 고르기, 구매, 판매, 치료. JUnit 대신 main 으로 실행한다 (Team_Rules 2.11).
  * 실패가 하나라도 있으면 종료 코드 1.
@@ -23,9 +28,6 @@ public final class ShopCheck {
     /** 진열 확률을 볼 때 상점을 몇 번 열어 볼지. */
     private static final int ROLLS = 4000;
     private static final Position MERCHANT = new Position(5, 5);
-
-    private static int passed;
-    private static int failed;
 
     private ShopCheck() {
     }
@@ -41,10 +43,7 @@ public final class ShopCheck {
         checkHeal();
         checkRestore();
 
-        System.out.println("통과 " + passed + " / 실패 " + failed);
-        if (failed > 0) {
-            System.exit(1);
-        }
+        CheckRunner.finish();
     }
 
     /** 모든 아이템에 상점가가 있고, 팔 때는 상점가의 20% (소수점 버림). 가장 싼 물약도 1골드 이상 받는다. */
@@ -70,25 +69,25 @@ public final class ShopCheck {
             for (int i = 0; i < ROLLS; i++) {
                 List<ItemKind> stock = Shop.rollStock(level);
                 if (stock.size() != Shop.STOCK_SIZE) {
-                    fail(level + "층 진열 개수", stock.size());
+                    fail(level + "층 진열 개수" + ": " + stock.size());
                     return;
                 }
                 int finalLevel = level;
                 if (!stock.stream().allMatch(k -> k.canDropOn(finalLevel) || k.canDropOn(finalLevel + 1))) {
-                    fail(level + "층 진열에 맞지 않는 층 아이템", stock);
+                    fail(level + "층 진열에 맞지 않는 층 아이템" + ": " + stock);
                     return;
                 }
                 if (!stock.equals(stock.stream().sorted().toList())) {
-                    fail(level + "층 진열 정렬", stock);
+                    fail(level + "층 진열 정렬" + ": " + stock);
                     return;
                 }
                 boolean onlyThisFloor = stock.stream().allMatch(k -> k.canDropOn(finalLevel));
                 if (level == Shop.MIN_FLOOR && onlyThisFloor && new HashSet<>(stock).size() == stock.size()) {
-                    fail("2층 아이템만 있으면 4종이라 겹쳐야 함", stock);
+                    fail("2층 아이템만 있으면 4종이라 겹쳐야 함" + ": " + stock);
                     return;
                 }
             }
-            passed++;
+            pass();
         }
         Shop shop = Shop.open(3, MERCHANT);
         expect("open: 상품 5개", shop.getStock().size(), Shop.STOCK_SIZE);
@@ -134,25 +133,27 @@ public final class ShopCheck {
         Player player = new Player("테스트", Job.WARRIOR);
         player.addGold(55);
 
-        String bought = shop.buy(player, 0);
-        expect("구매 메시지", bought, "철 검을(를) 50골드에 샀습니다.");
+        expect("구매", shop.buy(player, 0), TradeResult.done("철 검을(를) 50골드에 샀습니다."));
         expect("구매: 골드 차감", player.getGold(), 5);
         expect("구매: 가방에 들어감", player.getInventory().get(0).getId(), "IRON_SWORD");
         expect("구매: 진열에서 빠짐", ids(shop.getStock()), List.of("HP_POTION_S"));
 
-        String poor = shop.buy(player, 0);
-        expect("골드 부족 메시지", poor.startsWith("골드가 모자랍니다."), true);
+        TradeResult poor = shop.buy(player, 0);
+        expect("골드 부족: 거래 안 됨", poor.success(), false);
+        expect("골드 부족 메시지", poor.message().startsWith("골드가 모자랍니다."), true);
         expect("골드 부족: 그대로", List.of(player.getGold(), shop.getStock().size()), List.of(5, 1));
 
-        expect("없는 번호", shop.buy(player, 3), "4번 상품은 없습니다.");
-        expect("음수 번호", shop.buy(player, -1), "0번 상품은 없습니다.");
+        expect("없는 번호", shop.buy(player, 3), TradeResult.rejected("4번 상품은 없습니다."));
+        expect("음수 번호", shop.buy(player, -1), TradeResult.rejected("0번 상품은 없습니다."));
 
         Player full = new Player("가득", Job.WARRIOR);
         full.addGold(1000);
         for (int i = 0; i < Inventory.CAPACITY; i++) {
             full.getInventory().add(ItemFactory.createById("MP_POTION_S"));
         }
-        expect("가방이 가득 차면 못 삼", shop.buy(full, 0).startsWith("가방이 가득 차서"), true);
+        TradeResult fullBag = shop.buy(full, 0);
+        expect("가방이 가득: 거래 안 됨", fullBag.success(), false);
+        expect("가방이 가득 차면 못 삼", fullBag.message().startsWith("가방이 가득 차서"), true);
         expect("가방이 가득: 골드·진열 그대로", List.of(full.getGold(), shop.getStock().size()), List.of(1000, 1));
     }
 
@@ -162,11 +163,11 @@ public final class ShopCheck {
         player.getInventory().add(ItemFactory.createById("HP_POTION_S"));
         player.getInventory().add(ItemFactory.createById("STEEL_SWORD"));
 
-        expect("판매 메시지", shop.sell(player, 1), "강철 검을(를) 18골드에 팔았습니다.");
+        expect("판매", shop.sell(player, 1), TradeResult.done("강철 검을(를) 18골드에 팔았습니다."));
         expect("판매: 골드", player.getGold(), 18);
         expect("판매: 가방에서 빠짐", ids(player.getInventory().getItems()), List.of("HP_POTION_S"));
         expect("판매: 판 아이템은 진열되지 않음", shop.getStock().size(), 2);
-        expect("없는 칸", shop.sell(player, 1), "가방 2번 칸에는 아이템이 없습니다.");
+        expect("없는 칸", shop.sell(player, 1), TradeResult.rejected("가방 2번 칸에는 아이템이 없습니다."));
 
         Item sword = ItemFactory.createById("IRON_SWORD");
         player.getInventory().add(sword);
@@ -179,32 +180,32 @@ public final class ShopCheck {
         Player player = new Player("테스트", Job.WARRIOR);
         player.addGold(100);
 
-        expect("HP 가 가득하면 치료 안 함", shop.heal(player), "HP 가 이미 가득합니다.");
+        expect("HP 가 가득하면 치료 안 함", shop.heal(player), TradeResult.rejected("HP 가 이미 가득합니다."));
         expect("HP 가 가득: 골드·사용 여부 그대로", List.of(player.getGold(), shop.isHealUsed()), List.of(100, false));
 
         int maxHp = player.getMaxHp();
         player.takeDamage(maxHp - 1);
-        String healed = shop.heal(player);
+        TradeResult healed = shop.heal(player);
         int expected = maxHp * Shop.HEAL_PERCENT / 100;
-        expect("치료 메시지", healed, "치료를 받아 HP 를 " + expected + " 회복했습니다. (20골드)");
+        expect("치료", healed, TradeResult.done("치료를 받아 HP 를 " + expected + " 회복했습니다. (20골드)"));
         expect("치료: HP", player.getStats().getHp(), 1 + expected);
         expect("치료: 골드", player.getGold(), 80);
         expect("치료: 사용함", shop.isHealUsed(), true);
-        expect("두 번째 치료는 안 됨", shop.heal(player), "치료는 이 상점에서 이미 받았습니다.");
+        expect("두 번째 치료는 안 됨", shop.heal(player), TradeResult.rejected("치료는 이 상점에서 이미 받았습니다."));
         expect("두 번째 치료: 골드 그대로", player.getGold(), 80);
 
         Player almostFull = new Player("거의", Job.WARRIOR);
         almostFull.addGold(20);
         almostFull.takeDamage(1);
         Shop other = Shop.open(2, MERCHANT);
-        expect("치료한 만큼만 알려 줌", other.heal(almostFull), "치료를 받아 HP 를 1 회복했습니다. (20골드)");
+        expect("치료한 만큼만 알려 줌", other.heal(almostFull), TradeResult.done("치료를 받아 HP 를 1 회복했습니다. (20골드)"));
         expect("최대 HP 를 넘지 않음", almostFull.getStats().getHp(), almostFull.getMaxHp());
 
         Shop deep = Shop.open(5, MERCHANT);
         Player poor = new Player("가난", Job.WARRIOR);
         poor.addGold(49);
         poor.takeDamage(5);
-        expect("5층 치료 50골드: 모자람", deep.heal(poor), "골드가 모자랍니다. (치료 50골드, 보유 49골드)");
+        expect("5층 치료 50골드: 모자람", deep.heal(poor), TradeResult.rejected("골드가 모자랍니다. (치료 50골드, 보유 49골드)"));
         expect("골드 부족: 사용 안 함", deep.isHealUsed(), false);
     }
 
@@ -214,15 +215,10 @@ public final class ShopCheck {
         expect("restore: 치료 여부", shop.isHealUsed(), true);
         expect("restore: 4층 치료 40골드", shop.getHealCost(), 40);
         expect("restore: 빈 진열 허용", Shop.restore(2, MERCHANT, List.of(), false).getStock().size(), 0);
-        try {
-            Shop.restore(2, MERCHANT, List.of(
-                    ItemFactory.createById("HP_POTION_S"), ItemFactory.createById("HP_POTION_S"),
-                    ItemFactory.createById("HP_POTION_S"), ItemFactory.createById("HP_POTION_S"),
-                    ItemFactory.createById("HP_POTION_S"), ItemFactory.createById("HP_POTION_S")), false);
-            fail("상품 6개는 예외", "예외 없음");
-        } catch (IllegalArgumentException e) {
-            passed++;
-        }
+        expectThrows("상품 6개는 예외", IllegalArgumentException.class, () -> Shop.restore(2, MERCHANT, List.of(
+                ItemFactory.createById("HP_POTION_S"), ItemFactory.createById("HP_POTION_S"),
+                ItemFactory.createById("HP_POTION_S"), ItemFactory.createById("HP_POTION_S"),
+                ItemFactory.createById("HP_POTION_S"), ItemFactory.createById("HP_POTION_S")), false));
     }
 
     /** 철 검(50), 작은 치유 물약(20)이 진열된 2층 상점. */
@@ -233,19 +229,5 @@ public final class ShopCheck {
 
     private static List<String> ids(List<Item> items) {
         return items.stream().map(Item::getId).toList();
-    }
-
-    private static void fail(String name, Object actual) {
-        failed++;
-        System.out.println("[실패] " + name + ": " + actual);
-    }
-
-    private static void expect(String name, Object actual, Object expected) {
-        if (Objects.equals(actual, expected)) {
-            passed++;
-        } else {
-            failed++;
-            System.out.println("[실패] " + name + ": 기대 " + expected + " / 실제 " + actual);
-        }
     }
 }

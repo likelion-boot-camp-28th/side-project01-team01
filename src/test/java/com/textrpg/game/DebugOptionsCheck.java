@@ -1,15 +1,15 @@
 package com.textrpg.game;
 
-import java.util.Objects;
+import com.textrpg.CheckRunner;
+
+import static com.textrpg.CheckRunner.expect;
+import static com.textrpg.CheckRunner.expectThrows;
 
 /**
  * DebugOptions 확인용: 명령줄 인자 읽기와 잘못된 값 거절.
  * JUnit 대신 main 으로 실행한다 (Team_Rules 2.11). 실패가 하나라도 있으면 종료 코드 1.
  */
 public final class DebugOptionsCheck {
-
-    private static int passed;
-    private static int failed;
 
     private DebugOptionsCheck() {
     }
@@ -18,10 +18,7 @@ public final class DebugOptionsCheck {
         checkParse();
         checkInvalid();
 
-        System.out.println("통과 " + passed + " / 실패 " + failed);
-        if (failed > 0) {
-            System.exit(1);
-        }
+        CheckRunner.finish();
     }
 
     private static void checkParse() {
@@ -41,28 +38,14 @@ public final class DebugOptionsCheck {
     }
 
     private static void checkInvalid() {
-        expectThrows("숫자가 아닌 층", new String[] {"--start-floor=abc"});
-        expectThrows("빈 층", new String[] {"--start-floor="});
-        expectThrows("0층", new String[] {"--start-floor=0"});
-        expectThrows("최하층보다 깊음", new String[] {"--start-floor=6"});
+        expectRejected("숫자가 아닌 층", new String[] {"--start-floor=abc"});
+        expectRejected("빈 층", new String[] {"--start-floor="});
+        expectRejected("0층", new String[] {"--start-floor=0"});
+        expectRejected("최하층보다 깊음", new String[] {"--start-floor=6"});
     }
 
-    private static void expect(String name, Object actual, Object expected) {
-        if (Objects.equals(actual, expected)) {
-            passed++;
-        } else {
-            failed++;
-            System.out.println("[실패] " + name + ": 기대 " + expected + " / 실제 " + actual);
-        }
-    }
-
-    private static void expectThrows(String name, String[] args) {
-        try {
-            DebugOptions.parse(args);
-            failed++;
-            System.out.println("[실패] " + name + ": IllegalArgumentException 이 나지 않음");
-        } catch (IllegalArgumentException e) {
-            passed++;
-        }
+    /** 잘못된 인자면 parse 가 IllegalArgumentException 을 던져야 한다. */
+    private static void expectRejected(String name, String[] args) {
+        expectThrows(name, IllegalArgumentException.class, () -> DebugOptions.parse(args));
     }
 }

@@ -2,7 +2,12 @@ package com.textrpg.save;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
+
+import com.textrpg.CheckRunner;
+
+import static com.textrpg.CheckRunner.expect;
+import static com.textrpg.CheckRunner.expectThrows;
+import static com.textrpg.CheckRunner.fail;
 
 /**
  * SaveFileParser 확인용. JUnit 대신 main 으로 실행한다 (Team_Rules 2.11).
@@ -55,9 +60,6 @@ public final class SaveFileParserCheck {
             "[ITEMS]",
             "item=GOLD:15,20,4");
 
-    private static int passed;
-    private static int failed;
-
     private SaveFileParserCheck() {
     }
 
@@ -70,10 +72,7 @@ public final class SaveFileParserCheck {
         checkMissingValues();
         checkImmutable();
 
-        System.out.println("통과 " + passed + " / 실패 " + failed);
-        if (failed > 0) {
-            System.exit(1);
-        }
+        CheckRunner.finish();
     }
 
     private static void checkSample() {
@@ -124,7 +123,7 @@ public final class SaveFileParserCheck {
         expect("없는 섹션은 기본값", p.getInt("RUN", "turn", 7), 7);
         expect("없는 섹션의 목록", p.getList("INVENTORY", "item"), List.of());
         expect("없는 key 의 목록", p.getList("PROFILE", "item"), List.of());
-        expectThrows("기본값이 있어도 숫자가 아니면 오류",
+        expectThrows("기본값이 있어도 숫자가 아니면 오류", SaveLoadException.class,
                 () -> SaveFileParser.parse(List.of("[U]", "MAX_HP=abc")).getInt("U", "MAX_HP", 0));
     }
 
@@ -137,16 +136,16 @@ public final class SaveFileParserCheck {
         expectCorrupted("중복 섹션", List.of("[PLAYER]", "level=1", "", "[PLAYER]"), "4번째 줄");
         expectCorrupted("닫히지 않은 섹션", List.of("[PLAYER"), "1번째 줄");
 
-        expectIllegalArgument("lines 가 null", () -> SaveFileParser.parse(null));
-        expectIllegalArgument("null 줄", () -> SaveFileParser.parse(Arrays.asList("[A]", null)));
+        expectThrows("lines 가 null", IllegalArgumentException.class, () -> SaveFileParser.parse(null));
+        expectThrows("null 줄", IllegalArgumentException.class, () -> SaveFileParser.parse(Arrays.asList("[A]", null)));
     }
 
     private static void checkMissingValues() {
         SaveFileParser p = SaveFileParser.parse(List.of("[PLAYER]", "level=abc"));
-        expectThrows("없는 섹션", () -> p.getString("RUN", "turn"));
-        expectThrows("없는 key", () -> p.getString("PLAYER", "name"));
-        expectThrows("없는 key 의 getInt", () -> p.getInt("PLAYER", "exp"));
-        expectThrows("숫자가 아님", () -> p.getInt("PLAYER", "level"));
+        expectThrows("없는 섹션", SaveLoadException.class, () -> p.getString("RUN", "turn"));
+        expectThrows("없는 key", SaveLoadException.class, () -> p.getString("PLAYER", "name"));
+        expectThrows("없는 key 의 getInt", SaveLoadException.class, () -> p.getInt("PLAYER", "exp"));
+        expectThrows("숫자가 아님", SaveLoadException.class, () -> p.getInt("PLAYER", "level"));
 
         try {
             p.getInt("PLAYER", "level");
@@ -159,53 +158,17 @@ public final class SaveFileParserCheck {
     private static void checkImmutable() {
         SaveFileParser p = SaveFileParser.parse(List.of("[INVENTORY]", "item=A"));
         List<String> items = p.getList("INVENTORY", "item");
-        try {
-            items.add("B");
-            failed++;
-            System.out.println("[실패] getList 결과를 수정할 수 있음");
-        } catch (UnsupportedOperationException e) {
-            passed++;
-        }
+        expectThrows("getList 결과는 수정할 수 없음", UnsupportedOperationException.class, () -> items.add("B"));
         expect("파서 내부는 그대로", p.getList("INVENTORY", "item"), List.of("A"));
-    }
-
-    private static void expect(String name, Object actual, Object expected) {
-        if (Objects.equals(actual, expected)) {
-            passed++;
-        } else {
-            failed++;
-            System.out.println("[실패] " + name + ": 기대 " + expected + " / 실제 " + actual);
-        }
-    }
-
-    private static void expectThrows(String name, Runnable action) {
-        try {
-            action.run();
-            failed++;
-            System.out.println("[실패] " + name + ": SaveLoadException 이 나지 않음");
-        } catch (SaveLoadException e) {
-            passed++;
-        }
     }
 
     /** SaveLoadException 이 나고, 메시지에 줄 번호가 들어 있는지. */
     private static void expectCorrupted(String name, List<String> lines, String lineLabel) {
         try {
             SaveFileParser.parse(lines);
-            failed++;
-            System.out.println("[실패] " + name + ": SaveLoadException 이 나지 않음");
+            fail(name + ": SaveLoadException 이 나지 않음");
         } catch (SaveLoadException e) {
             expect(name + " 메시지에 줄 번호", e.getMessage().contains(lineLabel), true);
-        }
-    }
-
-    private static void expectIllegalArgument(String name, Runnable action) {
-        try {
-            action.run();
-            failed++;
-            System.out.println("[실패] " + name + ": IllegalArgumentException 이 나지 않음");
-        } catch (IllegalArgumentException e) {
-            passed++;
         }
     }
 }

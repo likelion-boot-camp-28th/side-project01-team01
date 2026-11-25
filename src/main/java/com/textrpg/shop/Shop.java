@@ -141,55 +141,56 @@ public class Shop {
     }
 
     /**
-     * index 번 상품을 산다. 가방에 넣고 골드를 낸 뒤 진열에서 뺀다. 결과 문장을 돌려준다.
-     * 번호가 없거나, 가방이 가득 찼거나, 골드가 모자라면 아무것도 바뀌지 않는다.
+     * index 번 상품을 산다. 가방에 넣고 골드를 낸 뒤 진열에서 뺀다.
+     * 번호가 없거나, 가방이 가득 찼거나, 골드가 모자라면 아무것도 바뀌지 않는다 (rejected).
      */
-    public String buy(Player player, int index) {
+    public TradeResult buy(Player player, int index) {
         if (index < 0 || index >= stock.size()) {
-            return (index + 1) + "번 상품은 없습니다.";
+            return TradeResult.rejected((index + 1) + "번 상품은 없습니다.");
         }
         Item item = stock.get(index);
         if (player.getInventory().isFull()) {
-            return "가방이 가득 차서 " + item.getDisplayName() + "을(를) 살 수 없습니다.";
+            return TradeResult.rejected("가방이 가득 차서 " + item.getDisplayName() + "을(를) 살 수 없습니다.");
         }
         if (!player.spendGold(item.getPrice())) {
-            return "골드가 모자랍니다. (" + item.getDisplayName() + " " + item.getPrice()
-                    + "골드, 보유 " + player.getGold() + "골드)";
+            return TradeResult.rejected("골드가 모자랍니다. (" + item.getDisplayName() + " " + item.getPrice()
+                    + "골드, 보유 " + player.getGold() + "골드)");
         }
         player.getInventory().add(item);
         stock.remove(index);
-        return item.getDisplayName() + "을(를) " + item.getPrice() + "골드에 샀습니다.";
+        return TradeResult.done(item.getDisplayName() + "을(를) " + item.getPrice() + "골드에 샀습니다.");
     }
 
     /**
-     * 가방의 index 번 아이템을 판다. 판 아이템은 진열되지 않고 사라진다. 결과 문장을 돌려준다.
+     * 가방의 index 번 아이템을 판다. 판 아이템은 진열되지 않고 사라진다.
+     * 가방에 그 번호가 없으면 아무것도 바뀌지 않는다 (rejected).
      */
-    public String sell(Player player, int index) {
+    public TradeResult sell(Player player, int index) {
         if (index < 0 || index >= player.getInventory().size()) {
-            return "가방 " + (index + 1) + "번 칸에는 아이템이 없습니다.";
+            return TradeResult.rejected("가방 " + (index + 1) + "번 칸에는 아이템이 없습니다.");
         }
         Item item = player.getInventory().remove(index);
         int price = sellPrice(item);
         player.addGold(price);
-        return item.getDisplayName() + "을(를) " + price + "골드에 팔았습니다.";
+        return TradeResult.done(item.getDisplayName() + "을(를) " + price + "골드에 팔았습니다.");
     }
 
     /**
-     * 치료를 받는다: getHealCost() 골드를 내고 최대 HP 의 HEAL_PERCENT % 를 회복한다. 결과 문장을 돌려준다.
-     * 이미 받았거나, HP 가 가득하거나, 골드가 모자라면 골드를 내지 않는다.
+     * 치료를 받는다: getHealCost() 골드를 내고 최대 HP 의 HEAL_PERCENT % 를 회복한다.
+     * 이미 받았거나, HP 가 가득하거나, 골드가 모자라면 골드를 내지 않는다 (rejected).
      */
-    public String heal(Player player) {
+    public TradeResult heal(Player player) {
         if (healUsed) {
-            return "치료는 이 상점에서 이미 받았습니다.";
+            return TradeResult.rejected("치료는 이 상점에서 이미 받았습니다.");
         }
         if (player.getStats().getHp() >= player.getMaxHp()) {
-            return "HP 가 이미 가득합니다.";
+            return TradeResult.rejected("HP 가 이미 가득합니다.");
         }
         if (!player.spendGold(getHealCost())) {
-            return "골드가 모자랍니다. (치료 " + getHealCost() + "골드, 보유 " + player.getGold() + "골드)";
+            return TradeResult.rejected("골드가 모자랍니다. (치료 " + getHealCost() + "골드, 보유 " + player.getGold() + "골드)");
         }
         healUsed = true;
         int healed = player.heal(Math.max(1, player.getMaxHp() * HEAL_PERCENT / 100));
-        return "치료를 받아 HP 를 " + healed + " 회복했습니다. (" + getHealCost() + "골드)";
+        return TradeResult.done("치료를 받아 HP 를 " + healed + " 회복했습니다. (" + getHealCost() + "골드)");
     }
 }

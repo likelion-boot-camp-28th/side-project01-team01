@@ -20,7 +20,8 @@ import com.textrpg.monster.MonsterType;
 import com.textrpg.shop.Shop;
 
 /**
- * 모든 콘솔 출력의 단일 창구. 다른 클래스는 System.out 을 직접 쓰지 않는다.
+ * 모든 콘솔 출력의 단일 창구. 다른 클래스는 System.out 을 직접 쓰지 않는다
+ * (예외: 입력 프롬프트와 입력 오류 안내는 InputHandler 가 출력한다).
  * 맵·상태줄 렌더링(render, printStatusBar 등)은 A 파트가 이 클래스에 추가한다.
  *
  * <p>색(ANSI)을 켜면 지도의 몬스터·아이템, 기호 안내, HP·MP 막대, 화면 제목, 가방 아이템 이름에 색을 입힌다.

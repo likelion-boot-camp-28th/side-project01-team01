@@ -10,10 +10,10 @@ import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import com.textrpg.CheckRunner;
 import com.textrpg.context.GameContext;
 import com.textrpg.core.Position;
 import com.textrpg.entity.Job;
@@ -31,6 +31,9 @@ import com.textrpg.monster.MonsterFactory;
 import com.textrpg.monster.MonsterType;
 import com.textrpg.shop.Shop;
 
+import static com.textrpg.CheckRunner.expect;
+import static com.textrpg.CheckRunner.expectThrows;
+
 /**
  * SaveManager 파일 입출력과 프로필 저장·불러오기(SlotCodec) 확인용. JUnit 대신 main 으로 실행한다 (Team_Rules 2.11).
  * 실패가 하나라도 있으면 종료 코드 1.
@@ -38,9 +41,6 @@ import com.textrpg.shop.Shop;
  * <p>케이스마다 임시 폴더를 새로 만들고 끝나면 지운다. 실제 saves 폴더는 건드리지 않는다.
  */
 public final class SaveManagerCheck {
-
-    private static int passed;
-    private static int failed;
 
     private SaveManagerCheck() {
     }
@@ -57,6 +57,7 @@ public final class SaveManagerCheck {
         withTempDir(SaveManagerCheck::checkWithParserAndWriter);
         withTempDir(SaveManagerCheck::checkProfileRoundTrip);
         withTempDir(SaveManagerCheck::checkClearRun);
+        withTempDir(SaveManagerCheck::checkHasRun);
         withTempDir(SaveManagerCheck::checkSlotSummary);
         withTempDir(SaveManagerCheck::checkBrokenProfile);
         withTempDir(SaveManagerCheck::checkRunEncode);
@@ -67,10 +68,7 @@ public final class SaveManagerCheck {
         withTempDir(SaveManagerCheck::checkBrokenShop);
         checkRunResultRestore();
 
-        System.out.println("통과 " + passed + " / 실패 " + failed);
-        if (failed > 0) {
-            System.exit(1);
-        }
+        CheckRunner.finish();
     }
 
     private static void checkSlotNumbers(Path root) {
@@ -144,31 +142,27 @@ public final class SaveManagerCheck {
         Path saveDir = Files.createDirectories(root.resolve("saves"));
         SaveManager m = new SaveManager(saveDir);
 
-        SaveLoadException missing = expectThrows("없는 파일 읽기", SaveLoadException.class, () -> m.readLines(2));
-        if (missing != null) {
+        expectThrows("없는 파일 읽기", SaveLoadException.class, () -> m.readLines(2)).ifPresent(missing -> {
             expect("없는 파일 원인", missing.getCause() instanceof NoSuchFileException, true);
             expect("메시지에 파일 이름", missing.getMessage().contains("slot2.sav"), true);
             expect("메시지에 폴더 경로는 없음", missing.getMessage().contains(saveDir.toString()), false);
-        }
+        });
 
         // 0xC3 0x28 은 UTF-8 로 해석할 수 없는 바이트 조합
         Files.write(saveDir.resolve("slot1.sav"), new byte[] {'[', 'A', ']', '\n', (byte) 0xC3, 0x28});
-        SaveLoadException broken = expectThrows("UTF-8 이 아닌 파일", SaveLoadException.class, () -> m.readLines(1));
-        if (broken != null) {
-            expect("손상 파일 원인", broken.getCause() instanceof CharacterCodingException, true);
-        }
+        expectThrows("UTF-8 이 아닌 파일", SaveLoadException.class, () -> m.readLines(1))
+                .ifPresent(broken -> expect("손상 파일 원인", broken.getCause() instanceof CharacterCodingException, true));
     }
 
     private static void checkWriteFailures(Path root) throws IOException {
         // 세이브 폴더 자리에 일반 파일이 있으면 폴더를 만들 수 없다
         Path notADir = Files.writeString(root.resolve("saves"), "폴더가 아님");
         SaveManager blocked = new SaveManager(notADir);
-        SaveLoadException noDir = expectThrows("폴더를 만들 수 없음", SaveLoadException.class,
-                () -> blocked.writeLines(1, List.of("[A]")));
-        if (noDir != null) {
+        expectThrows("폴더를 만들 수 없음", SaveLoadException.class,
+                () -> blocked.writeLines(1, List.of("[A]"))).ifPresent(noDir -> {
             expect("폴더 실패 원인 보관", noDir.getCause() instanceof IOException, true);
             expect("폴더 실패 메시지에 파일 이름", noDir.getMessage().contains("slot1.sav"), true);
-        }
+        });
 
         // 슬롯 파일 자리에 비어 있지 않은 폴더가 있으면 교체(move)가 실패한다
         Path saveDir = Files.createDirectories(root.resolve("saves2"));
@@ -363,8 +357,22 @@ public final class SaveManagerCheck {
         m.writeLines(1, with(valid, goblin, goblin.replace("GOBLIN", "DRAGON")));
         expect("탐험만 손상된 요약", m.getSlotSummary(1), "파편 200 | 최고 3층 | 탐험 6회 | 탐험 기록 손상");
         m.writeLines(1, replaceKey(valid, "shards=", "shards=-1"));
-        SaveLoadException e = expectThrows("프로필이 손상되면 전체 손상", SaveLoadException.class, () -> m.load(1));
-        expect("프로필 손상은 CorruptedRunException 아님", e instanceof CorruptedRunException, false);
+        expectThrows("프로필이 손상되면 전체 손상", SaveLoadException.class, () -> m.load(1))
+                .ifPresent(e -> expect("프로필 손상은 CorruptedRunException 아님", e instanceof CorruptedRunException, false));
+    }
+
+    /** hasRun: 객체를 복원하지 않고 [RUN] 섹션만 본다. load(slot).hasRun() 과 같은 답이어야 한다. */
+    private static void checkHasRun(Path root) {
+        SaveManager m = new SaveManager(root.resolve("saves"));
+        expect("파일이 없으면 탐험 없음", m.hasRun(1), false);
+        m.save(1, SlotData.profileOnly(sampleProfile()));
+        expect("프로필만 있으면 탐험 없음", m.hasRun(1), false);
+        expect("load 와 같은 답 (탐험 없음)", m.hasRun(1), m.load(1).hasRun());
+        m.save(1, SlotData.withRun(sampleProfile(), sampleRun()));
+        expect("탐험이 있으면 true", m.hasRun(1), true);
+        expect("load 와 같은 답 (탐험 있음)", m.hasRun(1), m.load(1).hasRun());
+        m.writeLines(2, List.of("version=1"));
+        expectThrows("형식이 깨진 파일은 SaveLoadException", SaveLoadException.class, () -> m.hasRun(2));
     }
 
     /** 상점이 있는 층: [SHOP] 에 상인 위치, 치료 여부, 남은 진열 상품을 쓰고 그대로 되살린다. 상점이 없으면 섹션도 없다. */
@@ -520,10 +528,8 @@ public final class SaveManagerCheck {
 
     private static void expectBrokenRun(SaveManager m, String name, List<String> lines) {
         m.writeLines(1, lines);
-        CorruptedRunException e = expectThrows("탐험 손상: " + name, CorruptedRunException.class, () -> m.load(1));
-        if (e != null) {
-            expect("탐험 손상(" + name + ")에도 프로필 유지", e.getProfile().getShards(), 200);
-        }
+        expectThrows("탐험 손상: " + name, CorruptedRunException.class, () -> m.load(1))
+                .ifPresent(e -> expect("탐험 손상(" + name + ")에도 프로필 유지", e.getProfile().getShards(), 200));
     }
 
     /** key= 로 시작하는 첫 줄을 replacement 로 바꾼 사본. */
@@ -544,37 +550,6 @@ public final class SaveManagerCheck {
         }
         copy.set(index, replacement);
         return copy;
-    }
-
-    private static void expect(String name, Object actual, Object expected) {
-        if (Objects.equals(actual, expected)) {
-            passed++;
-        } else {
-            failed++;
-            System.out.println("[실패] " + name + ": 기대 " + expected + " / 실제 " + actual);
-        }
-    }
-
-    /**
-     * expected 종류의 예외가 나야 통과. 잡은 예외를 돌려주므로 원인·메시지를 이어서 확인할 수 있다.
-     *
-     * @return 잡은 예외, 예외가 없거나 다른 종류면 null (실패로 집계됨)
-     */
-    private static <T extends RuntimeException> T expectThrows(String name, Class<T> expected, Runnable action) {
-        try {
-            action.run();
-            failed++;
-            System.out.println("[실패] " + name + ": " + expected.getSimpleName() + " 이 나지 않음");
-        } catch (RuntimeException e) {
-            if (expected.isInstance(e)) {
-                passed++;
-                return expected.cast(e);
-            }
-            failed++;
-            System.out.println("[실패] " + name + ": 기대 " + expected.getSimpleName()
-                    + " / 실제 " + e.getClass().getSimpleName());
-        }
-        return null;
     }
 
     /** 케이스 하나를 새 임시 폴더에서 실행하고, 끝나면 폴더를 통째로 지운다. */

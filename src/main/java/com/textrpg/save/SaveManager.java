@@ -60,6 +60,17 @@ public class SaveManager {
         return SlotCodec.decode(SaveFileParser.parse(readLines(slot)));
     }
 
+    /**
+     * 진행 중인 탐험이 있는지. 객체를 복원하지 않고 [RUN] 섹션이 있는지만 본다 (슬롯 메뉴의 "이어하기" 표시용).
+     * 탐험 섹션이 손상됐는지는 확인하지 않는다. 그건 불러올 때(load) 알 수 있다.
+     *
+     * @return 파일이 없으면 false
+     * @throws SaveLoadException 파일을 읽을 수 없거나 형식이 깨졌을 때
+     */
+    public boolean hasRun(int slot) {
+        return exists(slot) && SaveFileParser.parse(readLines(slot)).hasSection(SlotCodec.RUN);
+    }
+
     /** 사망·클리어 후 탐험 섹션을 지우고 갱신된 프로필만 저장한다 (영구 죽음). */
     public void clearRun(int slot, Profile updated) {
         save(slot, SlotData.profileOnly(updated));
