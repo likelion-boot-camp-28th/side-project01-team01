@@ -2,7 +2,11 @@ package com.textrpg.game;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import com.textrpg.context.GameContext;
 import com.textrpg.core.Position;
@@ -50,6 +54,7 @@ public class GameManager {
     private final InputHandler input;
     private final SaveManager saveManager;
     private final TurnSystem turnSystem;
+    private final DebugOptions debug;
 
     private GameState state = GameState.MAIN_MENU;
     /** 선택한 슬롯 번호 (1 ~ SaveManager.SLOT_COUNT). 슬롯을 고르기 전에는 0. */
@@ -60,10 +65,17 @@ public class GameManager {
     private GameContext run;
 
     public GameManager(ConsoleView view, InputHandler input, SaveManager saveManager, TurnSystem turnSystem) {
+        this(view, input, saveManager, turnSystem, DebugOptions.NONE);
+    }
+
+    /** @param debug 개발·시연용 옵션 (--debug-shards, --start-floor=N). 보통 실행은 DebugOptions.NONE */
+    public GameManager(ConsoleView view, InputHandler input, SaveManager saveManager, TurnSystem turnSystem,
+                       DebugOptions debug) {
         this.view = view;
         this.input = input;
         this.saveManager = saveManager;
         this.turnSystem = turnSystem;
+        this.debug = debug;
     }
 
     /** QUIT 이 될 때까지 화면을 차례로 보여 준다. Main 이 호출한다. */
@@ -112,7 +124,7 @@ public class GameManager {
             options.add("슬롯 " + i + "  " + saveManager.getSlotSummary(i));
         }
         options.add("종료");
-        view.printMenu(ConsoleView.GAME_TITLE, options);
+        view.printMenu(debug.isEnabled() ? ConsoleView.GAME_TITLE + " [디버그]" : ConsoleView.GAME_TITLE, options);
 
         int choice = input.readInt("번호: ", 1, options.size());
         if (choice == options.size()) {
@@ -121,6 +133,7 @@ public class GameManager {
         slot = choice;
         if (!saveManager.exists(slot)) {
             startNewProfile();
+            applyDebugShards();
             return GameState.SLOT_MENU;
         }
         try {
@@ -139,7 +152,30 @@ public class GameManager {
             }
             startNewProfile();
         }
+        applyDebugShards();
         return GameState.SLOT_MENU;
+    }
+
+    /**
+     * --debug-shards: 고른 슬롯의 파편이 기준보다 적으면 기준까지 채운다. 나머지 기록·강화는 그대로 둔다.
+     * 바로 저장하지 않고, 제단 구매나 탐험이 끝날 때 함께 저장된다.
+     */
+    private void applyDebugShards() {
+        if (profile.getShards() >= debug.minShards()) {
+            return;
+        }
+        Set<Job> unlocked = EnumSet.noneOf(Job.class);
+        for (Job job : Job.values()) {
+            if (profile.isUnlocked(job)) {
+                unlocked.add(job);
+            }
+        }
+        Map<UpgradeType, Integer> levels = new EnumMap<>(UpgradeType.class);
+        for (UpgradeType t : UpgradeType.values()) {
+            levels.put(t, profile.getLevel(t));
+        }
+        profile = Profile.restore(debug.minShards(), profile.getTotalRuns(), profile.getBestFloor(),
+                profile.getClears(), profile.getTotalKills(), unlocked, levels);
     }
 
     /** 이 슬롯을 빈 프로필로 시작하고 바로 저장한다. */
@@ -235,9 +271,12 @@ public class GameManager {
         Player player = new Player(name, job);
         profile.applyTo(player);
 
-        Floor first = DungeonGenerator.generate(1);
+        // --start-floor=N 이면 그 층에서 시작한다. 보통은 1층
+        Floor first = DungeonGenerator.generate(debug.startFloor());
         player.setPos(first.getStartPos());
-        run = new GameContext(player, first, new RunResult());
+        RunResult result = new RunResult();
+        result.reachFloor(first.getLevel());
+        run = new GameContext(player, first, result);
         run.getLog().add("어둠 속으로 들어왔습니다. ? 를 누르면 도움말을 볼 수 있습니다.");
         saveManager.save(slot, SlotData.withRun(profile, run));
     }
