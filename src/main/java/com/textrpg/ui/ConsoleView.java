@@ -94,7 +94,11 @@ public class ConsoleView {
             printLine(line);
         }
         printStatusBar(player);
-        for (String line : formatLegend(floor.getMonsters())) {
+        // 기호 안내에는 지금 보이는 몬스터만 넣는다. 안 보이는 몬스터를 알려 주지 않도록
+        List<Monster> visibleMonsters = floor.getMonsters().stream()
+                .filter(m -> floor.isVisible(m.getPos().x(), m.getPos().y()))
+                .toList();
+        for (String line : formatLegend(visibleMonsters)) {
             printLine(line);
         }
         printDivider();

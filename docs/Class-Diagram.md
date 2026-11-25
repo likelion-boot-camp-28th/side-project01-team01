@@ -204,7 +204,9 @@ classDiagram
 
 > 턴 순서(플레이어 행동 → 몬스터 행동 → 턴 마무리)는 `TurnSystem.playTurn()` 한곳에서 정한다. `INVENTORY`, `HELP`, `SAVE_QUIT`은 턴을 쓰지 않는 화면 명령이라 `GameManager`가 처리한다. 사망 원인은 `playTurn()`이 `DIED`를 돌려준 직후 `getDeathCause()`로 읽는다.
 >
-> `MapRenderer.symbolAt()` 우선순위: 플레이어 `@` → 몬스터 기호 → 바닥 아이템 기호 → 타일 기호. P1 시야 적용 시 안 본 칸은 공백, 본 적 있지만 지금 안 보이는 칸은 타일만(몬스터 숨김).
+> `MapRenderer.symbolAt()` 우선순위: 플레이어 `@` → 몬스터 기호 → 바닥 아이템 기호 → 타일 기호. 시야에 따라 안 본 칸은 공백, 본 적 있지만 지금 안 보이는 칸은 타일만(몬스터·아이템 숨김). 기호 안내에도 지금 보이는 몬스터만 넣는다.
+>
+> 연속 이동(`dddd`)은 이번 턴에 피해를 입었거나, 전에 안 보이던 몬스터가 보이게 됐거나, 몬스터가 바로 옆에 있으면 남은 이동을 버린다 (`GameManager.isInterrupted`).
 
 ---
 
@@ -720,7 +722,7 @@ classDiagram
 | `revealAll()` | **P1**. 모든 칸을 `seen`으로 표시 (지도 두루마리) | B |
 | `exportTiles()` / `exportSeen()` / `exportRooms()` | 세이브용 문자열. `exportRooms()`는 방마다 `x,y,width,height` 한 줄 | A |
 
-> P0(시야 구현 전)에서는 `MapRenderer`가 `seen`/`visible`을 무시하고 전체를 그린다. P1 시야를 켜면 `MapRenderer.symbolAt()` 주석의 규칙(안 본 칸은 공백, 본 적만 있는 칸은 타일만)을 적용한다.
+> `MapRenderer.symbolAt()`은 `seen`/`visible`을 보고 그린다: 안 본 칸은 공백, 본 적만 있는 칸은 타일만, 보이는 칸은 몬스터·아이템까지.
 
 ### 5.2 Tile · Room 규칙
 
@@ -767,7 +769,9 @@ classDiagram
 2. 플레이어가 방 안에 있으면(`roomAt != null`) 그 방의 벽까지 포함한 전체를 `setVisible`한다.
 3. 복도·문 위에 있으면 주변 `CORRIDOR_RADIUS`(=1)칸을 `setVisible`한다.
 
-플레이어가 이동한 뒤마다 호출한다. 호출 위치는 A의 `TurnSystem`이다.
+호출 위치(A):
+- `TurnSystem.tryMove()`: 플레이어가 한 칸 움직일 때마다. 연속 이동 중에 지나친 칸도 `seen`에 남는다.
+- `GameManager`: 새 탐험 시작, 아래층으로 내려간 직후, 이어하기로 불러온 직후. `visible`은 세이브에 없으므로 불러온 뒤 다시 계산한다.
 
 ### 5.5 검증 (`src/test/java/com/textrpg/map/DungeonGeneratorCheck`)
 
