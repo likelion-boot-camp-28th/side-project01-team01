@@ -16,6 +16,7 @@ import com.textrpg.map.FieldOfView;
 import com.textrpg.map.Floor;
 import com.textrpg.monster.Boss;
 import com.textrpg.monster.Monster;
+import com.textrpg.monster.MonsterType;
 
 /**
  * 탐험 중 한 턴을 처리한다: 플레이어 행동 → (턴을 썼으면) 몬스터 행동 → 턴 마무리.
@@ -27,6 +28,8 @@ import com.textrpg.monster.Monster;
  * <p>턴을 쓰지 못한 행동(NO_TURN)은 이유를 MessageLog 에 남긴다. 아무 반응이 없으면 입력이 무시된 것처럼 보이기 때문이다.
  */
 public class TurnSystem {
+    private static final int POISON_DURATION = 2;
+    private static final int POISON_DAMAGE = 2;
 
     private final CombatSystem combat;
     private final MonsterAI monsterAI;
@@ -59,11 +62,12 @@ public class TurnSystem {
                 if (runMonsters(ctx) == TurnOutcome.DIED) {
                     yield TurnOutcome.DIED;
                 }
-                endOfTurn(ctx);
-                yield TurnOutcome.TURN_USED;
+                yield endOfTurn(ctx);
             }
             case DESCENDED -> {
-                endOfTurn(ctx);
+                if (endOfTurn(ctx) == TurnOutcome.DIED) {
+                    yield TurnOutcome.DIED;
+                }
                 yield TurnOutcome.DESCENDED;
             }
             case NO_TURN, VICTORY, DIED -> playerOutcome;
@@ -239,6 +243,21 @@ public class TurnSystem {
         return TurnOutcome.DESCENDED;
     }
 
+    private TurnOutcome poisonActivate(GameContext ctx) {
+        Player player = ctx.getPlayer();
+        if (!player.detox(ctx.getTurn(), POISON_DURATION)) {
+            int damage = player.takeDamage(POISON_DAMAGE);
+            ctx.getLog().add(player.getName() + "의 체력이 독에 의해 " + damage + "만큼 감소했습니다.");
+            if (!player.isAlive()) {
+                deathCause = MonsterType.SPIDER.getDisplayName();
+                return TurnOutcome.DIED;
+            }
+            return TurnOutcome.TURN_USED;
+        }
+        ctx.getLog().add(player.getName() + "의 중독 상태가 해제되었습니다.");
+        return TurnOutcome.TURN_USED;
+    }
+
     /**
      * 층의 모든 몬스터가 한 번씩 행동한다. 도중에 플레이어가 쓰러지면 멈추고 deathCause 를 남긴다.
      * getMonsters() 는 복사본이라 행동 도중 몬스터가 층에서 빠져도 순회가 깨지지 않는다.
@@ -260,9 +279,17 @@ public class TurnSystem {
         return TurnOutcome.TURN_USED;
     }
 
-    /** 턴 수를 늘리고 자연 회복을 적용한다. */
-    private void endOfTurn(GameContext ctx) {
+    /**
+     * 턴 수를 늘리고 자연 회복을 적용한다.
+     *
+     * @return 플레이어가 쓰러졌으면 DIED, 아니면 TURN_USED
+     */
+    private TurnOutcome endOfTurn(GameContext ctx) {
         ctx.getPlayer().regenerate(ctx.nextTurn());
+        if (ctx.getPlayer().isPoisoned() && poisonActivate(ctx) == TurnOutcome.DIED) {
+            return TurnOutcome.DIED;
+        }
+        return TurnOutcome.TURN_USED;
     }
 
     /**

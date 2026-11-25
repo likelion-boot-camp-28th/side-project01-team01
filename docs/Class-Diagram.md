@@ -107,6 +107,8 @@ classDiagram
         QUIT
     }
     class TurnSystem {
+        -POISON_DURATION$ int
+        -POISON_DAMAGE$ int
         -CombatSystem combat
         -MonsterAI monsterAI
         -String deathCause
@@ -120,7 +122,8 @@ classDiagram
         -drop(int index, GameContext ctx) TurnOutcome
         -descend(GameContext ctx) TurnOutcome
         -runMonsters(GameContext ctx) TurnOutcome
-        -endOfTurn(GameContext ctx)
+        -poisonActivate(GameContext ctx) TurnOutcome
+        -endOfTurn(GameContext ctx) TurnOutcome
     }
     class TurnOutcome {
         <<enumeration>>
@@ -290,6 +293,8 @@ classDiagram
         -int hunger
         -Weapon weapon
         -Armor armor
+        -boolean poisoned
+        -int poisonedTurn
         -Inventory inventory
         +Player(String name, Job job)
         +getAttack() int
@@ -308,6 +313,9 @@ classDiagram
         +dropItem(int index) Item
         +addGold(int amount)
         +regenerate(int turn)
+        +isPoisoned() boolean
+        +poison(int turn) boolean
+        +detox(int turn, int poisonDuration) boolean
     }
     class Job {
         <<enumeration>>
@@ -574,6 +582,7 @@ classDiagram
 > 몬스터 특수 능력:
 > - **해골 병사 → 뼈 무더기**: `CombatSystem.rewardKill()`에서 SKELETON이 처치되면 같은 자리에 `MonsterFactory.createBones(pos, ctx.getTurn())`으로 뼈 무더기(`P`)를 놓는다. 해골 병사 자체는 경험치·골드가 0이고 처치 수(파편)에도 세지 않는다. 보상(14/14)과 처치 수 1은 뼈 무더기를 부숴야 받는다. 뼈 무더기는 생성 즉시 깨어 있고, 공격·이동하지 않으며(speed -1), `PileOfBones.isTimeToRevive(turn)`이 `turn >= birth + REVIVE_DURATION(4)`이 되면 `MonsterAI.act()`가 뼈 무더기를 빼고 그 자리에 `MonsterFactory.create(SKELETON, pos)`로 HP가 가득 찬 해골 병사를 놓는다.
 > - **오크**: 체력이 비정상적으로 높다 (`MonsterType` HP 40).
+> - **독거미 독**: `MonsterAI`에서 SPIDER의 공격이 명중(`AttackResult.hit()`)하면 `player.poison(turn)`으로 중독시킨다. 이미 중독 중이면 `poisonedTurn`만 갱신해 지속시간을 늘리고 로그는 남기지 않는다. 독 피해는 몬스터 수와 상관없이 턴당 한 번, `TurnSystem.endOfTurn()`에서 `nextTurn()`·자연 회복 뒤에 처리한다 (`DESCENDED` 턴 포함). `detox(turn, POISON_DURATION(2))`가 `turn > poisonedTurn + 2`가 되면 해제하고, 그 전에는 HP -`POISON_DAMAGE`(2)(방어 무시). 그래서 T턴에 맞으면 T턴과 T+1턴 마무리에 피해를 받고 T+2턴 마무리에 해제된다. 독으로 쓰러지면 `deathCause`는 `독거미`이고 `DIED`를 돌려준다.
 > - **그림자 기사 재생**: 깨어 있는 동안 행동 전 매 턴 HP +`MonsterAI.SHADOW_KNIGHT_RESTORATION`(2).
 > - **어둠의 파수꾼**: speed 2(명중·치명·회피율에만 사용). 공격 횟수는 `attacksPerTurn()`이 정해 평소 매 턴 1회. HP가 최대 HP의 절반 이하이면 `restore()`가 매 턴 HP +`ENRAGED_HEAL`(2) 재생하고, `attacksPerTurn()`은 2회를 돌려준다.
 
@@ -1024,6 +1033,9 @@ sequenceDiagram
             TS->>AI: act(monster, ctx)
         end
         TS->>TS: ctx.nextTurn(), player.regenerate(turn)
+        opt 중독 상태
+            TS->>TS: poisonActivate(ctx) (독 피해 또는 해제, 쓰러지면 DIED)
+        end
     end
     TS-->>GM: TurnOutcome (NO_TURN / TURN_USED / DESCENDED / VICTORY / DIED)
 ```
