@@ -278,7 +278,7 @@ public class Player extends Entity implements ItemUser {
             if (oldWeapon != null) {                     // ④ 원래 무기가 있었으면 가방으로
                 inventory.add(oldWeapon);
             }
-            return newWeapon.getDisplayName() + "을(를) 장착했다.";
+            return newWeapon.getDisplayName() + "을(를) 장착했습니다.";
 
         }
 
@@ -296,10 +296,10 @@ public class Player extends Entity implements ItemUser {
             if (oldArmor != null) {
                 inventory.add(oldArmor);
             }
-            return newArmor.getDisplayName() + "을(를) 장착했다.";
+            return newArmor.getDisplayName() + "을(를) 장착했습니다.";
         }
 
-        return item.getDisplayName() + "은(는) 장착할 수 없다.";
+        return item.getDisplayName() + "은(는) 장착할 수 없습니다.";
     }
 
     /**

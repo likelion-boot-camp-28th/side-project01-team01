@@ -147,7 +147,7 @@ public class ConsoleView {
         printTitle("도움말");
         printLine("w a s d   이동 (몬스터 쪽으로 이동하면 공격). dddd 처럼 이어서 입력 가능");
         printLine("g         발밑의 아이템 줍기 (밟으면 자동으로 주움. 가방이 가득 찼을 때 다시 줍기)");
-        printLine("i         가방 보기");
+        printLine("i         가방 보기 (가방 화면에서 바로 u/e/x 번호 입력 가능)");
         printLine("l         지난 로그 보기 (메시지마다 몇 번째 턴인지 표시)");
         printLine("u 번호    아이템 사용 (번호는 가방 화면 기준 1부터)");
         printLine("e 번호    무기·방어구 장착");
@@ -318,9 +318,9 @@ public class ConsoleView {
         return "사망 - " + result.getDeathCause() + "에게 쓰러졌습니다";
     }
 
-    /** 결과 요약 한 줄. 예: "도달 층 지하 3층  |  처치 14  |  레벨 4  |  골드 57" */
+    /** 결과 요약 한 줄. 예: "지하 3층  |  214턴  |  처치 14  |  레벨 4  |  골드 57" */
     static String formatResultSummary(RunResult result) {
-        return "도달 층 지하 " + result.getDeepestFloor() + "층  |  처치 " + result.getKills()
+        return "지하 " + result.getDeepestFloor() + "층  |  " + result.getTurns() + "턴  |  처치 " + result.getKills()
                 + "  |  레벨 " + result.getFinalLevel() + "  |  골드 " + result.getGold();
     }
 

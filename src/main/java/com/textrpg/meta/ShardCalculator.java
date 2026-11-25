@@ -22,6 +22,12 @@ public final class ShardCalculator {
      * 받을 파편 합계. 파편 수집가(SHARD_BOOST, P1) 단계만큼 % 를 더한다.
      */
     public static int calculate(RunResult r, Profile p) {
+        int total = baseTotal(r);
+        return total + boostAmount(total, p);
+    }
+
+    /** 파편 수집가를 적용하기 전 합계. */
+    private static int baseTotal(RunResult r) {
         int total = (r.getDeepestFloor() * SHARDS_PER_FLOOR);
         total += (r.getKills() * SHARDS_PER_KILL);
         total += (r.getFinalLevel() * SHARDS_PER_LEVEL);
@@ -29,8 +35,16 @@ public final class ShardCalculator {
         if (r.isVictory() == true) {
             total += CLEAR_BONUS;
         }
-        int boostPercent = p.getLevel(UpgradeType.SHARD_BOOST) * UpgradeType.SHARD_BOOST.getValuePerLevel();
-        return total + total * boostPercent / 100;
+        return total;
+    }
+
+    private static int boostPercent(Profile p) {
+        return p.getLevel(UpgradeType.SHARD_BOOST) * UpgradeType.SHARD_BOOST.getValuePerLevel();
+    }
+
+    /** 파편 수집가로 더 받는 파편. 소수점 아래는 버린다. */
+    private static int boostAmount(int baseTotal, Profile p) {
+        return baseTotal * boostPercent(p) / 100;
     }
 
     /**
@@ -50,7 +64,13 @@ public final class ShardCalculator {
         lines.add("골드 " + gold + " ÷ " + GOLD_PER_SHARD + " = " + (gold / GOLD_PER_SHARD));
 
         if (r.isVictory() == true) {
-            lines.add("클리어포인트 = " + CLEAR_BONUS);
+            lines.add("클리어 보너스 = " + CLEAR_BONUS);
+        }
+        int percent = boostPercent(p);
+        if (percent > 0) {
+            int base = baseTotal(r);
+            lines.add(UpgradeType.SHARD_BOOST.getDisplayName() + " " + base + " × " + percent + "% = "
+                    + boostAmount(base, p));
         }
         lines.add("합계 = " + calculate(r, p));
         return lines;

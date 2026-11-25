@@ -46,9 +46,13 @@ public class RunResult {
         deepestFloor = Math.max(deepestFloor, level);
     }
 
-    /** 사망하거나 클리어했을 때 호출한다. */
-    public void finish(Player p, boolean victory, String cause) {
-        // TODO(B, A와 합의): turns 는 GameContext.getTurn() 값을 받는 방법으로 A와 합의 필요
+    /**
+     * 사망하거나 클리어했을 때 호출한다.
+     *
+     * @param turns 탐험에 쓴 턴 수 (GameContext.getTurn())
+     */
+    public void finish(Player p, int turns, boolean victory, String cause) {
+        this.turns = turns;
         finalLevel = p.getLevel();
         gold = p.getGold();
         this.victory = victory;
