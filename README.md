@@ -1,48 +1,158 @@
 # Into the Dark
 
 순수 Java 17(외부 라이브러리 없음)로 만드는 콘솔 로그라이크 던전 크롤러.
-기획서와 클래스 다이어그램은 `docs/` 폴더(또는 팀 공유 문서)를 참고한다.
+지하 5층 끝에 있는 보스 **어둠의 파수꾼**을 쓰러뜨리는 것이 목표다. 죽으면 캐릭터는 사라지지만, 모은 **파편**으로 영구 강화를 사서 다음 탐험을 더 강하게 시작한다.
+
+기획서와 클래스 다이어그램은 `docs/` 폴더를 참고한다.
 
 ## 실행 방법
 
 필요한 것: JDK 17 이상. Gradle은 래퍼(`gradlew`)가 자동으로 받으므로 따로 설치하지 않아도 된다.
 
 ```bash
-./gradlew build                 # 컴파일 + jar 생성
-./gradlew run                   # 바로 실행 (IntelliJ 콘솔이면 --args="--no-clear")
+./gradlew build                 # 컴파일 + 확인(Check) 클래스 실행 + jar 생성
+./gradlew run                   # 바로 실행 (옵션은 --args="--no-clear" 처럼 전달)
 java -jar build/libs/into-the-dark-0.1.0.jar
 ```
 
 - Windows는 `gradlew.bat build` / `gradlew.bat run`.
 - 한글이 `???`로 깨지면: `java -Dstdout.encoding=UTF-8 -jar ...` 로 실행하거나, Windows 터미널에서 먼저 `chcp 65001`.
-- 화면 지우기(ANSI)가 안 되는 콘솔(IntelliJ 실행 창 등)은 `--no-clear` 옵션을 준다.
+
+### 실행 옵션
+
+| 옵션 | 동작 |
+|---|---|
+| `--no-clear` | 화면 지우기(ANSI) 대신 빈 줄로 밀어낸다. IntelliJ 실행 창처럼 ANSI를 지원하지 않는 콘솔용 |
+| `--debug-shards` | 슬롯을 고를 때 파편이 1000보다 적으면 1000으로 채운다 (시연·테스트용) |
+| `--start-floor=N` | 새 탐험을 지하 N층(1~5)에서 시작한다 (시연·테스트용) |
+
+```bash
+java -jar build/libs/into-the-dark-0.1.0.jar --debug-shards --start-floor=5   # 강화 후 보스층 바로 시연
+```
+
+- 디버그 옵션이 켜져 있으면 메인 메뉴 제목에 `[디버그]`가 붙는다.
+- 채운 파편도 실제 슬롯에 저장되므로, 테스트는 빈 슬롯에서 하는 것을 권장한다.
+- IntelliJ에서는 실행 구성의 Program arguments에 옵션을 넣는다.
+
+## 게임 흐름
+
+```
+슬롯 선택 → 새 탐험 → 던전 탐험(지하 1~5층) → 사망·클리어 → 파편 획득 → 어둠의 제단에서 강화 → 새 탐험 → ...
+```
+
+1. **슬롯 선택**: 세이브 슬롯은 3개. 슬롯마다 파편·강화·기록이 따로 남는다.
+2. **새 탐험**: 이름과 직업을 고르고 지하 1층에서 시작한다. 층마다 방과 복도, 몬스터, 아이템이 새로 만들어진다.
+3. **탐험**: 계단(`>`)을 찾아 아래층으로 내려간다. 시야 밖은 보이지 않고, 한 번 본 곳은 지도에 남는다.
+4. **결산**: 죽거나 보스를 쓰러뜨리면 탐험이 끝나고 파편을 받는다.
+5. **어둠의 제단**: 파편으로 영구 강화를 산다. 강화는 다음 탐험부터 적용된다.
+
+### 조작법
+
+턴제다. 이동·공격·아이템 사용·쉬기는 한 턴을 쓰고, 그때마다 몬스터도 움직인다.
+
+| 입력 | 동작 |
+|---|---|
+| `w` `a` `s` `d` | 위·왼쪽·아래·오른쪽 이동. 몬스터 쪽으로 이동하면 공격. `dddd`처럼 이어서 입력 가능 |
+| `g` | 발밑 아이템 줍기 (밟으면 자동으로 주움. 가방이 가득 찼을 때 다시 줍기) |
+| `i` | 가방 보기 |
+| `u 번호` | 아이템 사용 (번호는 가방 화면 기준 1부터) |
+| `e 번호` | 무기·방어구 장착 |
+| `x 번호` | 아이템 버리기 |
+| `>` | 계단 위에서 아래층으로 내려가기 |
+| `.` | 한 턴 쉬기 |
+| `l` | 지난 로그 보기 |
+| `save` | 저장 후 종료 (슬롯 메뉴의 이어하기로 계속) |
+| `?` | 도움말 |
+
+명령은 대소문자를 구분하지 않는다. 가방·로그·도움말·저장은 턴을 쓰지 않는다.
+
+### 지도 기호
+
+| 기호 | 의미 | 기호 | 의미 |
+|---|---|---|---|
+| `@` | 플레이어 | `!` | 물약 |
+| `#` | 벽 | `)` | 무기 |
+| `.` | 바닥 | `[` | 방어구 |
+| `:` | 복도 | `$` | 골드 |
+| `+` | 문 | 영문자 | 몬스터 (`S` 슬라임, `W` 늑대 등) |
+| `>` | 아래층 계단 | `&` | 보스: 어둠의 파수꾼 (지하 5층) |
+
+### 직업
+
+| 직업 | HP | 공격 | 방어 | 명중 | 치명·회피 | 해금 |
+|---|---|---|---|---|---|---|
+| 전사 | 30 | 5 | 3 | 90% | 5% | 처음부터 |
+| 마법사 | 22 | 4 | 1 | 90% | 5% | 제단 60 파편 |
+| 도적 | 25 | 5 | 2 | 95% | 15% | 제단 60 파편 |
+
+### 전투
+
+- 데미지 = `공격 × 6 / (6 + 방어) × 0.9~1.1` (최소 1, 치명타 1.5배). 방어 6이면 받는 피해가 절반이 된다.
+- 공격은 명중률로 맞았는지 굴린 뒤, 상대 회피율로 한 번 더 굴린다. 명중률은 100%를 넘을 수 있다.
+- 몬스터를 쓰러뜨리면 경험치와 골드를 얻고, 레벨이 오르면 HP·공격·방어가 오른다.
+- 물약은 최대 HP·MP의 일정 비율을 회복한다 (작은 치유 물약 25%, 큰 치유 물약 50%).
+
+### 파편과 영구 강화
+
+탐험이 끝나면 다음 공식으로 파편을 받는다.
+
+```
+파편 = 도달 층 × 10 + 처치 수 × 1 + 레벨 × 3 + 골드 ÷ 10 (+ 클리어 보너스 100)
+```
+
+| 강화 | 효과 (단계당) | 최대 단계 |
+|---|---|---|
+| 강인한 육체 | 최대 HP +5 | 5 |
+| 날카로운 칼날 | 공격 +1 | 3 |
+| 단단한 피부 | 방어 +1 | 3 |
+| 매의 눈 | 명중률 +3% | 3 |
+| 보급품 | 시작 시 치유 물약 +1 | 2 |
+| 큰 가방 | 가방 칸 +2 | 2 |
+| 배움의 축복 | 경험치 획득 +10% | 3 |
+| 파편 수집가 | 파편 획득 +10% | 3 |
+| 직업 해금: 마법사 / 도적 | 직업 선택 가능 | 1 |
+
+단계별 비용은 제단 화면에 표시된다.
+
+### 세이브
+
+- 세이브 파일은 실행한 폴더의 `saves/slot1.sav` ~ `slot3.sav`에 텍스트로 저장된다.
+- 새 탐험을 시작할 때, `save`로 종료할 때, 제단에서 강화를 살 때, 탐험이 끝날 때 저장한다.
+- 탐험 기록만 손상된 경우 파편·강화는 살리고 탐험만 버린다 (슬롯 목록에 "탐험 기록 손상"으로 표시).
 
 ## 패키지와 담당
 
 | 패키지 | 담당 | 내용 |
 |---|---|---|
-| `game`, `ui`, `save`, `Main` | [@nullsector12](https://github.com/nullsector12) | 게임 루프, 명령 입력, 화면 렌더링, 세이브/로드, 제단 화면 |
+| `game`, `ui`, `save`, `context`, `Main` | [@nullsector12](https://github.com/nullsector12) | 게임 루프, 명령 입력, 화면 렌더링, 세이브/로드, 제단 화면 |
 | `entity`, `item`, `meta` | [@efkoskf](https://github.com/efkoskf) | 플레이어·직업·스탯, 아이템·가방, 영구 성장 |
 | `monster`, `combat` | [@oeuns2219](https://github.com/oeuns2219) | 몬스터·AI, 충돌 전투 |
-| `map` | [@gunheekk](https://github.com/gunheekk) | 타일 맵, 방·복도 생성 |
-| `util` | [@nullsector12](https://github.com/nullsector12) | `RandomUtil` |
+| `map` | [@gunheekk](https://github.com/gunheekk) | 타일 맵, 방·복도 생성, 시야 |
+| `core`, `util` | [@nullsector12](https://github.com/nullsector12) | 좌표·방향·메시지 로그, `RandomUtil` |
 
-## 공통 클래스 (이미 구현됨, 변경 시 팀 공유 필수)
+## 공통 클래스 (변경 시 팀 공유 필수)
 
 | 클래스 | 용도 |
 |---|---|
-| `entity.Position` | 좌표 record. x=열(0~59), y=행(0~19). `move()`, `distanceTo()`, `isAdjacent()` |
-| `map.Direction` | `UP/DOWN/LEFT/RIGHT`, `fromKey('w')` |
+| `core.Position` | 좌표 record. x=열(0~59), y=행(0~19). `move()`, `distanceTo()`, `isAdjacent()` |
+| `core.Direction` | `UP/DOWN/LEFT/RIGHT`, `fromKey('w')` |
+| `core.MessageLog` | 게임 메시지 기록. `add()`, `recent(n)` |
 | `map.Tile` | 타일 종류, 화면 문자/세이브 문자/통행 가능 여부 |
-| `entity.Stats` | HP·MP·공격·방어·명중·치명타·회피 (확률은 퍼센트 0~100) |
+| `entity.Stats` | HP·MP·공격·방어·명중·치명타·회피 (확률은 퍼센트, 명중률은 100 초과 가능) |
 | `entity.Entity` | 플레이어·몬스터 공통 부모. `takeDamage()`, `heal()`, `getAttack()`/`getDefense()` 추상 |
 | `item.ItemType` | 아이템 분류와 맵 기호 |
-| `game.MessageLog` | 게임 메시지 기록. `add()`, `recent(n)` |
+| `context.GameContext` | 탐험 하나의 상태 (플레이어, 현재 층, 로그, 결과) |
 | `ui.ConsoleView` | 모든 출력의 창구. `printLine()`, `printMenu()`, `bar()` |
 | `ui.InputHandler` | 모든 입력의 창구. `readLine()`, `readInt()`, `confirm()` |
 | `util.RandomUtil` | 모든 난수의 창구. `nextInt(min, max)`, `chance(%)`, `setSeed()` |
 
+## 테스트
+
+JUnit 대신 `src/test/java`의 `...Check` 클래스를 `main`으로 실행한다 (Team_Rules 2.11). `./gradlew build`가 `build.gradle`의 `checkClasses` 목록을 모두 실행하고, 하나라도 실패하면 빌드가 실패한다. 새 Check 클래스를 만들면 목록에 등록한다.
+
 ## 규칙 문서
 
+- [Team_Rules.md](docs/Team_Rules.md): 팀 규칙, 코드 작성 규칙
 - [Git_Convention.md](docs/Git_Convention.md): 브랜치 전략, 커밋 메시지, PR 규칙
-- [Team_Rules.md](docs/Team_Rules.md): 협업 규칙, 프로젝트 고유 규칙, 코드 컨벤션
+- [Project-Plan.md](docs/Project-Plan.md): 기획서
+- [Class-Diagram.md](docs/Class-Diagram.md): 클래스 다이어그램
