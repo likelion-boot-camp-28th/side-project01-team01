@@ -337,8 +337,10 @@ public class Floor {
      * @return 본 적 있으면 true, 맵 밖이면 false
      */
     public boolean isSeen(int x, int y) {
-        // TODO(D): P1 시야
-        throw new UnsupportedOperationException("Floor.isSeen 은 아직 구현되지 않았습니다.");
+        if (!isInRange(x, y)) {
+            return false;
+        }
+        return seen[y][x];
     }
 
     /**
@@ -348,8 +350,10 @@ public class Floor {
      * @param y 행
      */
     public void markSeen(int x, int y) {
-        // TODO(D): P1 시야
-        throw new UnsupportedOperationException("Floor.markSeen 은 아직 구현되지 않았습니다.");
+        if (!isInRange(x, y)) {
+            return;
+        }
+        seen[y][x] = true;
     }
 
     /**
@@ -360,8 +364,10 @@ public class Floor {
      * @return 보이면 true, 맵 밖이면 false
      */
     public boolean isVisible(int x, int y) {
-        // TODO(D): P1 시야
-        throw new UnsupportedOperationException("Floor.isVisible 은 아직 구현되지 않았습니다.");
+        if (!isInRange(x, y)) {
+            return false;
+        }
+        return visible[y][x];
     }
 
     /**
@@ -371,24 +377,29 @@ public class Floor {
      * @param y 행
      */
     public void setVisible(int x, int y) {
-        // TODO(D): P1 시야
-        throw new UnsupportedOperationException("Floor.setVisible 은 아직 구현되지 않았습니다.");
+        if (!isInRange(x, y)) {
+            return;
+        }
+        visible[y][x] = true;
+        markSeen(x, y);
     }
 
     /**
      * (P1) 모든 칸을 안 보이는 상태로 되돌린다. 매 턴 시야 계산 전에 호출한다.
      */
     public void clearVisible() {
-        // TODO(D): P1 시야
-        throw new UnsupportedOperationException("Floor.clearVisible 은 아직 구현되지 않았습니다.");
+        for (boolean[] row : visible) {
+            Arrays.fill(row, false);
+        }
     }
 
     /**
      * (P1) 모든 칸을 seen 으로 표시한다. 지도 두루마리용.
      */
     public void revealAll() {
-        // TODO(D): P1 지도 두루마리
-        throw new UnsupportedOperationException("Floor.revealAll 은 아직 구현되지 않았습니다.");
+        for (boolean[] row : seen) {
+            Arrays.fill(row, true);
+        }
     }
 
     /**
