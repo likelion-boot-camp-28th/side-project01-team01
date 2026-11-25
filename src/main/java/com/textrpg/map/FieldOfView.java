@@ -20,7 +20,20 @@ public final class FieldOfView {
      * @param playerPos 플레이어 위치
      */
     public static void update(Floor f, Position playerPos) {
-        // TODO(D): clearVisible → roomAt 이면 방 전체(벽 포함) setVisible, 아니면 주변 CORRIDOR_RADIUS 칸
-        throw new UnsupportedOperationException("FieldOfView.update 는 아직 구현되지 않았습니다.");
+        f.clearVisible();
+        Room currentRoom = f.roomAt(playerPos);
+        if (currentRoom != null) {
+            for (int y = currentRoom.y() - 1; y <= currentRoom.y() + currentRoom.height(); y++) {
+                for (int x = currentRoom.x() - 1; x <= currentRoom.x() + currentRoom.width(); x++) {
+                    f.setVisible(x, y);
+                }
+            }
+        } else {
+            for (int dy = -CORRIDOR_RADIUS; dy <= CORRIDOR_RADIUS; dy++) {
+                for (int dx = -CORRIDOR_RADIUS; dx <= CORRIDOR_RADIUS; dx++) {
+                    f.setVisible(playerPos.x() + dx, playerPos.y() + dy);
+                }
+            }
+        }
     }
 }
