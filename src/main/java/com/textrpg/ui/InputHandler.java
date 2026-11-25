@@ -10,7 +10,7 @@ public class InputHandler {
     private final Scanner scanner = new Scanner(System.in, java.nio.charset.StandardCharsets.UTF_8);
 
     /**
-     * 한 줄을 읽어 앞뒤 공백을 제거해 돌려준다.
+     * 한 줄을 읽어 앞뒤 공백을 제거해 돌려준다. 전각 공백(U+3000) 같은 유니코드 공백도 지운다.
      *
      * @throws InputClosedException 입력 스트림이 끝났을 때
      */
@@ -20,7 +20,9 @@ public class InputHandler {
         if (!scanner.hasNextLine()) {
             throw new InputClosedException();
         }
-        return scanner.nextLine().trim();
+        // trim() 은 U+0020 이하만 지워 전각 공백이 남는다. 세이브(SaveFileWriter)가 strip() 기준으로
+        // 앞뒤 공백을 검사하므로, 이름 끝에 전각 공백이 있으면 저장하다 예외가 났다
+        return scanner.nextLine().strip();
     }
 
     /**

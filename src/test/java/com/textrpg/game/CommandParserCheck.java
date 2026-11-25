@@ -34,6 +34,8 @@ public final class CommandParserCheck {
         expect(null, List.of());
         expect("", List.of());
         expect("   ", List.of());
+        // 전각 공백(U+3000)도 공백으로 본다
+        expect("　", List.of());
     }
 
     private static void checkMoves() {
@@ -43,6 +45,7 @@ public final class CommandParserCheck {
         expect("d", List.of(Command.move(Direction.RIGHT)));
         expect("W", List.of(Command.move(Direction.UP)));
         expect("  d  ", List.of(Command.move(Direction.RIGHT)));
+        expect("d　", List.of(Command.move(Direction.RIGHT)));
         expect("ddd", List.of(Command.move(Direction.RIGHT), Command.move(Direction.RIGHT),
                 Command.move(Direction.RIGHT)));
         expect("wasd", List.of(Command.move(Direction.UP), Command.move(Direction.LEFT),
@@ -74,6 +77,7 @@ public final class CommandParserCheck {
         expect("E 1", List.of(Command.item(CommandType.EQUIP, 0)));
         expect("x 12", List.of(Command.item(CommandType.DROP, 11)));
         expect("u   5", List.of(Command.item(CommandType.USE, 4)));
+        expect("u　3", List.of(Command.item(CommandType.USE, 2)));
     }
 
     private static void checkUnknownInput() {
