@@ -1,7 +1,8 @@
 package com.textrpg.entity;
 
 /**
- * 캐릭터·몬스터 공통 능력치. 확률 값(hitRate 등)은 퍼센트(0~100)로 저장한다.
+ * 캐릭터·몬스터 공통 능력치. 확률 값(hitRate 등)은 퍼센트로 저장한다.
+ * 명중률은 강화로 100 을 넘을 수 있다 (넘는 만큼은 효과가 없고, 회피는 따로 굴린다).
  * HP/MP 는 0 ~ max 범위를 벗어나지 않게 setter 에서 보정한다.
  */
 public class Stats {
