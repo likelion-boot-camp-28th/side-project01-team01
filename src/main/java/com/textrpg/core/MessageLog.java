@@ -58,7 +58,7 @@ public class MessageLog {
         return recentEntries(unreadCount);
     }
 
-    /** 지금까지의 메시지를 읽은 것으로 표시한다. 플레이어가 새 행동을 시작할 때 GameManager 가 호출한다. */
+    /** 지금까지의 메시지를 읽은 것으로 표시한다. 플레이어가 새 행동을 시작할 때 ExplorationScreen 이 호출한다. */
     public void markRead() {
         unreadCount = 0;
     }
