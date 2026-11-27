@@ -108,7 +108,7 @@ public class ConsoleView {
     /**
      * 탐험 화면 한 장을 그린다: 화면 지우기 → 헤더(층·턴) → 맵 → 상태줄 → 기호 안내 → 구분선 → 새 메시지.
      * 메시지는 마지막 행동 이후에 생긴 것(MessageLog.unread)만 보여 주고, 지난 메시지는 로그 화면(l)에서 본다.
-     * 명령 입력 안내는 입력을 받는 GameManager 가 출력한다.
+     * 명령 입력 안내는 입력을 받는 ExplorationScreen 이 출력한다.
      *
      * @param ctx 이번 탐험의 컨텍스트 (층, 플레이어, 턴, 메시지 로그)
      */
@@ -176,7 +176,7 @@ public class ConsoleView {
 
     /**
      * 상점 화면: 진열 상품(살 때 가격), 치료, 장착 중인 장비, 가방(팔 때 받는 값). 번호는 1부터 보여 준다.
-     * 명령 입력 안내는 입력을 받는 GameManager 가 출력한다.
+     * 명령 입력 안내는 입력을 받는 ShopScreen 이 출력한다.
      */
     public void printShop(Shop shop, Player player) {
         printTitle(Shop.MERCHANT_NAME + "  |  골드 " + player.getGold()

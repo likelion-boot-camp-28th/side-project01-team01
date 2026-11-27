@@ -15,7 +15,7 @@ import com.textrpg.util.RandomUtil;
 
 /**
  * 층에 하나 있을 수 있는 상점. 상인 위치, 진열 상품, 치료를 받았는지를 가진다.
- * 상점방 배치는 DungeonGenerator 가, 상점 화면과 입력은 GameManager 가 맡고, 사고팔기 규칙은 여기서 정한다.
+ * 상점방 배치는 DungeonGenerator 가, 상점 화면과 입력은 ShopScreen 이 맡고, 사고팔기 규칙은 여기서 정한다.
  *
  * <ul>
  *   <li>진열: 칸마다 그 층에서 나올 수 있는 아이템 중 하나를 같은 확률로 고른다. 이미 진열된 종류면 그 층 아이템 중에서

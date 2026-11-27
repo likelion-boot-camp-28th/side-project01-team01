@@ -20,10 +20,10 @@ import com.textrpg.monster.MonsterType;
 
 /**
  * 탐험 중 한 턴을 처리한다: 플레이어 행동 → (턴을 썼으면) 몬스터 행동 → 턴 마무리.
- * 턴 순서를 이 클래스 한곳에서 정하므로 GameManager 는 playTurn() 결과만 보고 화면을 바꾼다.
+ * 턴 순서를 이 클래스 한곳에서 정하므로 ExplorationScreen 은 playTurn() 결과만 보고 화면을 바꾼다.
  *
  * <p>가방 보기(INVENTORY), 도움말(HELP), 로그 보기(LOG), 상인과 대화(TALK), 저장 후 종료(SAVE_QUIT)는 턴을 쓰지 않는 화면 명령이라
- * GameManager 가 직접 처리하고 이 클래스로 넘기지 않는다.
+ * ExplorationScreen 이 직접 처리하고 이 클래스로 넘기지 않는다.
  *
  * <p>턴을 쓰지 못한 행동(NO_TURN)은 이유를 MessageLog 에 남긴다. 아무 반응이 없으면 입력이 무시된 것처럼 보이기 때문이다.
  */
@@ -89,7 +89,7 @@ public class TurnSystem {
             case DESCEND -> descend(ctx);
             case WAIT -> TurnOutcome.TURN_USED;
             case INVENTORY, HELP, LOG, TALK, SAVE_QUIT -> throw new IllegalArgumentException(
-                    "턴을 쓰지 않는 화면 명령은 GameManager 가 처리합니다: " + cmd.type());
+                    "턴을 쓰지 않는 화면 명령은 ExplorationScreen 이 처리합니다: " + cmd.type());
         };
     }
 
@@ -234,7 +234,7 @@ public class TurnSystem {
     }
 
     /**
-     * 계단 위에서 내려간다. 새 층을 만드는 일은 GameManager 가 한다.
+     * 계단 위에서 내려간다. 새 층을 만드는 일은 ExplorationScreen 이 한다.
      * 보스층은 계단이 없어(getStairs() 가 비어 있음) 항상 NO_TURN 이다.
      *
      * @return 계단 위면 DESCENDED, 아니면 NO_TURN
