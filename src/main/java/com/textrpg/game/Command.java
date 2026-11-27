@@ -5,7 +5,7 @@ import java.util.Objects;
 import com.textrpg.core.Direction;
 
 /**
- * 플레이어 명령 하나. CommandParser 가 만들고 GameManager / TurnSystem 이 실행한다.
+ * 플레이어 명령 하나. CommandParser 가 만들고, 화면 명령은 ExplorationScreen 이, 나머지는 TurnSystem 이 실행한다.
  * 생성자 대신 정적 팩토리(move, of, item)로 만들고, type 과 맞지 않는 값 조합은 생성 시점에 막는다.
  *
  * @param type      명령 종류
